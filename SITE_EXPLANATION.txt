@@ -1,0 +1,69 @@
+# How the Mystery Box Site Works
+
+## Overview
+This site is a professional casino-style mystery box opening platform built with Next.js, React, and Cardano blockchain integration. Users connect their Cardano wallet, purchase credits, and use those credits to open digital mystery boxes. Each box opening is provably fair and results in a random reward, with all actions and balances securely managed via a backend API and Supabase database.
+
+---
+
+## Mystery Box Opening Animation & Logic
+
+### 1. **User Flow**
+- User connects their Cardano wallet.
+- User purchases credits using ADA (Cardano's cryptocurrency).
+- User clicks "Open Professional Box" to spend credits and open a mystery box.
+
+### 2. **Animation Sequence**
+- The animation is handled by the `SimplifiedCaseOpening` React component.
+- When the user initiates a box opening:
+  1. **Opening Animation:** The box visually opens with anticipation effects (e.g., glow, shake, particles).
+  2. **Spinning/Carousel:** A carousel of possible rewards spins, simulating randomness and building suspense.
+  3. **Reveal:** The carousel slows and stops on the winning symbol, which is highlighted with effects based on rarity (e.g., confetti for rare items).
+  4. **Prize Modal:** A modal pops up showing the reward, its value, and a "Continue Playing" button. Credits are automatically added to the user's balance.
+
+### 3. **Backend Logic**
+- The frontend calls the `/api/open-case-credits` endpoint, which:
+  - Deducts credits from the user in the database.
+  - Randomly selects a reward using a provably fair algorithm (server and client seed, nonce, etc.).
+  - Records the result in the `case_openings` table.
+  - Returns the reward details to the frontend for animation and display.
+- All credit and reward changes are synced with the backend to prevent cheating or double-spending.
+
+### 4. **Provable Fairness**
+- Each case opening uses a combination of server and client seeds and a nonce to ensure the result is random and verifiable.
+- The result and all relevant data are stored in the database for auditability.
+
+---
+
+## Scalability: What if 100, 200, 1000, or 10,000 Users Use the Site at the Same Time?
+
+### **How the Site Handles Many Users**
+- **Frontend:** The React/Next.js frontend is stateless and can be horizontally scaled (multiple server instances, Vercel/Netlify, etc.).
+- **API:** All critical actions (buying credits, opening cases) go through API endpoints that interact with the database. These endpoints are stateless and can also be scaled horizontally.
+- **Database:** Supabase (Postgres) is used for all user, credit, and case data. It can handle thousands of concurrent connections, but performance depends on the chosen plan and instance size.
+- **Blockchain:** Credit purchases require Cardano blockchain confirmation, which is rate-limited by the network and Blockfrost API. This is the main bottleneck for very high concurrency.
+
+### **What Happens at Different Scales?**
+- **100 Users:**
+  - The site will handle this easily. All actions are fast, and the database/API will not be stressed.
+- **200-1000 Users:**
+  - The site will still perform well if the backend and database are properly provisioned (e.g., Supabase Pro plan, Vercel/Netlify scaling enabled).
+  - Some delay may occur in crediting purchases if the Cardano network or Blockfrost API is slow.
+- **10,000 Users:**
+  - The frontend and API can scale horizontally, but the database and especially the Cardano/Blockfrost API may become bottlenecks.
+  - You may hit rate limits on Blockfrost (Cardano API provider), causing delays in payment verification.
+  - Database write contention may occur if many users open cases at the exact same time, but Postgres/Supabase can handle high concurrency with proper indexing and scaling.
+  - You may need to implement queueing, caching, or sharding for extreme loads.
+
+### **Best Practices for High Concurrency**
+- Use a scalable cloud provider for both frontend and backend (Vercel, Netlify, AWS, etc.).
+- Upgrade Supabase/Postgres to a higher tier for more connections and throughput.
+- Monitor and upgrade Blockfrost API plan as needed, or run your own Cardano node for unlimited requests.
+- Implement rate limiting and retry logic in the API to handle temporary overloads.
+- Use optimistic UI updates with backend confirmation for best user experience.
+
+---
+
+## Summary
+- The site is designed to scale to hundreds or thousands of users with proper infrastructure.
+- The main bottleneck at very high scale is the Cardano blockchain and Blockfrost API, not the site code itself.
+- The mystery box opening animation is smooth, fair, and fully synced with backend logic for security and fun. 

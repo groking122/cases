@@ -1,15 +1,16 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --background: 0 0% 7%; /* Pure black */
+  --foreground: 0 0% 98%; /* Pure white */
+  --card: 0 0% 10%; /* Slightly lighter black */
+  --primary: 210 100% 50%; /* Vibrant blue */
+  --border: 0 0% 14.9%;
+  --input: 0 0% 14.9%;
+  --ring: 0 0% 83.1%;
+  --radius: 0.5rem;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,7 +21,119 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  @apply bg-background text-foreground min-h-screen;
+  background: linear-gradient(to bottom, #070707, #0a0a0a);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl;
+  }
+  
+  .minimal-card {
+    @apply glass-panel p-6 transition-all hover:border-white/20;
+  }
+  
+  .symbol-image {
+    @apply w-full h-full object-contain transition-all duration-300;
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.1));
+  }
+  
+  .symbol-image:hover {
+    @apply scale-105 brightness-110;
+    filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.3));
+  }
+  
+  .btn-primary {
+    @apply bg-primary text-black font-bold py-3 px-6 rounded-xl 
+           transition-all hover:bg-primary/90 hover:scale-[1.03] 
+           active:scale-95;
+  }
+}
+
+/* CS:GO-Style Custom Utilities */
+@layer utilities {
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
+  }
+  
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+  
+  .glow-effect {
+    filter: drop-shadow(0 0 10px currentColor);
+  }
+  
+  .case-shadow {
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -1px rgba(0, 0, 0, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* CS:GO-Style Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 5px currentColor); }
+  50% { filter: brightness(1.2) drop-shadow(0 0 20px currentColor); }
+}
+
+@keyframes item-reveal {
+  0% { 
+    transform: scale(0.8) rotateY(-90deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1) rotateY(0deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1) rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes rarity-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Custom scrollbar for inventory */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(55, 65, 81, 0.3);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Rarity-specific effects */
+.rarity-legendary {
+  background: linear-gradient(135deg, #F59E0B, #FBBF24, #F59E0B);
+  background-size: 200% 200%;
+  animation: rarity-shimmer 2s ease-in-out infinite, glow-pulse 1s ease-in-out infinite;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .case-shadow {
+    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+  }
 }

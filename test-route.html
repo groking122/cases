@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin Routes</title>
+</head>
+<body>
+    <h1>Admin Route Test</h1>
+    <button onclick="testGetCases()">Test GET Cases</button>
+    <button onclick="testPatchCase()">Test PATCH Case</button>
+    <div id="results"></div>
+
+    <script>
+        async function testGetCases() {
+            try {
+                const response = await fetch('/api/admin/cases', {
+                    headers: { 'Authorization': 'Bearer dev-token' }
+                });
+                const data = await response.json();
+                document.getElementById('results').innerHTML = 
+                    `<h3>GET Cases:</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                // Store first case ID for testing
+                if (data.success && data.data.items.length > 0) {
+                    window.testCaseId = data.data.items[0].id;
+                    console.log('Stored case ID:', window.testCaseId);
+                }
+            } catch (error) {
+                document.getElementById('results').innerHTML = 
+                    `<h3>GET Error:</h3><pre>${error.message}</pre>`;
+            }
+        }
+
+        async function testPatchCase() {
+            if (!window.testCaseId) {
+                alert('Run GET Cases first to get a case ID');
+                return;
+            }
+
+            try {
+                const testData = {
+                    name: 'Test Case Updated',
+                    description: 'Test description',
+                    price: 100,
+                    imageUrl: '',
+                    isActive: true,
+                    symbols: []
+                };
+
+                const response = await fetch(`/api/admin/cases/${window.testCaseId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': 'Bearer dev-token',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const data = await response.json();
+                document.getElementById('results').innerHTML = 
+                    `<h3>PATCH Response (${response.status}):</h3><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    
+            } catch (error) {
+                document.getElementById('results').innerHTML = 
+                    `<h3>PATCH Error:</h3><pre>${error.message}</pre>`;
+            }
+        }
+    </script>
+</body>
+</html>
