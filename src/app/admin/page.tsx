@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import type { AdminDashboardStats, CaseConfig, Symbol } from '@/types/admin'
 import CaseConfigurator from '@/components/admin/CaseConfigurator'
@@ -15,6 +16,7 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics'>('dashboard')
   const [stats, setStats] = useState<AdminDashboardStats | null>(null)
   const [cases, setCases] = useState<CaseConfig[]>([])
@@ -44,6 +46,11 @@ export default function AdminDashboard() {
           'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
         }
       })
+      if (statsResponse.status === 401 || statsResponse.status === 403) {
+        localStorage.removeItem('adminToken')
+        router.push('/admin/login')
+        return
+      }
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
         console.log('✅ Stats loaded:', statsData)
@@ -61,6 +68,11 @@ export default function AdminDashboard() {
           'Cache-Control': 'no-cache'
         }
       })
+      if (casesResponse.status === 401 || casesResponse.status === 403) {
+        localStorage.removeItem('adminToken')
+        router.push('/admin/login')
+        return
+      }
       if (casesResponse.ok) {
         const casesData = await casesResponse.json()
         setCases(casesData.data.items)
@@ -75,6 +87,11 @@ export default function AdminDashboard() {
           'Cache-Control': 'no-cache'
         }
       })
+      if (symbolsResponse.status === 401 || symbolsResponse.status === 403) {
+        localStorage.removeItem('adminToken')
+        router.push('/admin/login')
+        return
+      }
       if (symbolsResponse.ok) {
         const symbolsData = await symbolsResponse.json()
         setSymbols(symbolsData.data.items)
@@ -221,8 +238,30 @@ export default function AdminDashboard() {
                   cases={cases} 
                   onEditCase={setSelectedCase}
                   onDeleteCase={async (caseId) => {
-                    // Handle delete
-                    await loadDashboardData()
+                    if (!confirm('Are you sure you want to delete this case?')) return
+                    try {
+                      const response = await fetch(`/api/admin/cases/${caseId}`, {
+                        method: 'DELETE',
+                        headers: {
+                          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+                        }
+                      })
+                      if (response.status === 401 || response.status === 403) {
+                        localStorage.removeItem('adminToken')
+                        router.push('/admin/login')
+                        return
+                      }
+                      if (!response.ok) {
+                        const err = await response.json().catch(() => ({}))
+                        alert(`Failed to delete case: ${err.error || response.statusText}`)
+                        return
+                      }
+                      await loadDashboardData()
+                      alert('Case deleted successfully')
+                    } catch (e) {
+                      console.error('Delete case error:', e)
+                      alert('Error deleting case')
+                    }
                   }}
                 />
               )}

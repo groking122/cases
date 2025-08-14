@@ -108,6 +108,7 @@ export default function Home() {
   // Credit System
   const [userCredits, setUserCredits] = useState<UserCredits>({ credits: 0, loading: false })
   const [showCreditStore, setShowCreditStore] = useState(false)
+  const [walletAddress, setWalletAddress] = useState<string>("")
   
   // Inventory System
   const [showInventory, setShowInventory] = useState(false)
@@ -126,14 +127,16 @@ export default function Home() {
     try {
       setUserCredits(prev => ({ ...prev, loading: true }))
       const addresses = await wallet.getUsedAddresses()
-      const walletAddress = addresses?.[0]
+      const currentWalletAddress = addresses?.[0]
       
-      if (!walletAddress) return
+      if (!currentWalletAddress) return
+      
+      setWalletAddress(currentWalletAddress)
       
       const response = await fetch('/api/get-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress })
+        body: JSON.stringify({ walletAddress: currentWalletAddress })
       })
       
       if (response.ok) {
@@ -463,6 +466,8 @@ export default function Home() {
                           ← Back to Game
                         </Button>
                         <CreditPacks
+                          walletAddress={walletAddress}
+                          onCreditsUpdated={fetchUserCredits}
                           onPurchaseSuccess={handleCreditPurchaseSuccess}
                           onError={handlePaymentError}
                         />

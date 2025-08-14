@@ -26,7 +26,7 @@ const SymbolRenderer = ({
   const [isLoaded, setIsLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   
-  // Rarity-based styles - Dark minimal theme
+  // Rarity-based styles - Dark minimal theme with frame overlays
   const rarityStyles = {
     common: 'border-gray-600 bg-black/60 shadow-lg shadow-gray-500/20',
     uncommon: 'border-green-400 bg-black/70 shadow-lg shadow-green-400/30',
@@ -96,6 +96,12 @@ const SymbolRenderer = ({
               quality={100}
               sizes={`${size}px`}
             />
+            {/* Shine sweep overlay */}
+            <motion.div
+              className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+              animate={{ x: [-size, size] }}
+              transition={{ duration: 2.2, repeat: Infinity }}
+            />
           </div>
         ) : (
           <motion.div 
@@ -110,7 +116,7 @@ const SymbolRenderer = ({
             }
             transition={{ duration: 2, repeat: Infinity }}
           >
-            {symbol.icon || symbol.name.charAt(0)}
+            {symbol.emoji || symbol.name.charAt(0)}
           </motion.div>
         )}
       </div>

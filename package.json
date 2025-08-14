@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@emurgo/cardano-serialization-lib-nodejs": "^15.0.0",
     "@meshsdk/core": "^1.9.0-beta.62",
     "@meshsdk/react": "^1.9.0-beta.62",
     "@prisma/client": "^6.12.0",
@@ -38,6 +39,7 @@
     "gsap": "^3.13.0",
     "howler": "^2.2.4",
     "jsonwebtoken": "^9.0.2",
+    "lucid-cardano": "^0.10.11",
     "lucide-react": "^0.525.0",
     "next": "15.4.1",
     "prisma": "^6.12.0",

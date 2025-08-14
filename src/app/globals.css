@@ -20,10 +20,35 @@
   }
 }
 
+html {
+  background: #070707;
+  overscroll-behavior: none;
+  scroll-behavior: smooth;
+}
+
 body {
   @apply bg-background text-foreground min-h-screen;
   background: linear-gradient(to bottom, #070707, #0a0a0a);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Improve scroll chaining without white flash */
+html, body {
+  overscroll-behavior-y: contain;
 }
 
 @layer components {

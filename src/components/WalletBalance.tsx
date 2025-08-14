@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '@meshsdk/react'
 
@@ -62,7 +62,7 @@ export default function WalletBalance({
   }
 
   // Enhanced credit fetching with instant updates
-  const fetchCredits = async (showAnimation = false) => {
+  const fetchCredits = useCallback(async (showAnimation = false) => {
     if (!connected) return 0
 
     try {
@@ -100,7 +100,7 @@ export default function WalletBalance({
       console.error('Failed to fetch credits:', error)
     }
     return 0
-  }
+  }, [connected, wallet, externalWalletAddress])
 
   // Instant credit update (called externally)
   const updateCreditsInstantly = async (expectedCredits: number | undefined = undefined) => {
@@ -138,7 +138,7 @@ export default function WalletBalance({
   }
 
   // Enhanced balance fetcher with smooth updates
-  const fetchBalance = async (showCreditAnimation = true) => {
+  const fetchBalance = useCallback(async (showCreditAnimation = true) => {
     if (!connected) return
 
     setBalance(prev => ({ ...prev, loading: true }))
@@ -163,12 +163,24 @@ export default function WalletBalance({
       // Get credits with animation
       const credits = showCredits ? await fetchCredits(showCreditAnimation) : 0
 
-      setBalance({
-        ada: adaBalance,
-        token: 0,
-        credits,
-        loading: false,
-        lastUpdate: Date.now()
+      // Only update if values actually changed to prevent unnecessary re-renders
+      setBalance(prev => {
+        const hasChanges = 
+          prev.ada !== adaBalance || 
+          prev.credits !== credits || 
+          prev.loading !== false
+        
+        if (!hasChanges) {
+          return prev // Return the same object to prevent re-render
+        }
+        
+        return {
+          ada: adaBalance,
+          token: 0,
+          credits,
+          loading: false,
+          lastUpdate: Date.now()
+        }
       })
 
       // Notify parent of credit changes
@@ -184,7 +196,7 @@ export default function WalletBalance({
         error: 'Failed to fetch balance' 
       }))
     }
-  }
+  }, [connected, wallet, cardanoBalance, showCredits, fetchCredits, onCreditsChange])
 
   // Use external credits if provided, otherwise fetch them
   useEffect(() => {
@@ -219,11 +231,11 @@ export default function WalletBalance({
     }
   }, [forceRefresh, connected])
 
-  // Auto-refresh credits every 15 seconds if connected
+  // Auto-refresh credits every 30 seconds if connected (without animation to prevent shaking)
   useEffect(() => {
     if (!connected || !showCredits) return
 
-    const interval = setInterval(() => fetchBalance(true), 15000)
+    const interval = setInterval(() => fetchBalance(false), 30000)
     return () => clearInterval(interval)
   }, [connected, showCredits])
 

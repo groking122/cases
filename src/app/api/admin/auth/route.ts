@@ -251,6 +251,9 @@ export async function DELETE(request: NextRequest) {
 
 // Helper Functions
 async function incrementFailedLoginAttempts(adminId: string) {
+  if (!supabaseAdmin) {
+    return
+  }
   const { data: admin } = await supabaseAdmin
     .from('admin_users')
     .select('failed_login_attempts')

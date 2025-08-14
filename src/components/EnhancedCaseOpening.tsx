@@ -23,6 +23,7 @@ interface Case {
   price: number;
   image_url?: string;
   description?: string;
+  symbols?: Array<{ symbolId: string; weight: number; symbol: { key: string; name: string; imageUrl: string | null; rarity: string } }>
 }
 
 interface EnhancedCaseOpeningProps {
@@ -222,12 +223,20 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                   symbol: {
                     key: reward.id,
                     name: reward.name,
-                    emoji: reward.image || '⭐',
+                    emoji: '⭐',
                     imageUrl: reward.image_url || null
                   },
                   rarity: reward.rarity,
                   isWinning: true
                 } : null}
+                seed={`case-${selectedCase?.id}-${userId || 'guest'}-${Date.now()}`}
+                fillerPool={(selectedCase?.symbols || []).map(s => ({
+                  key: s.symbol.key,
+                  name: s.symbol.name,
+                  emoji: '⭐',
+                  imageUrl: s.symbol.imageUrl || null,
+                  rarity: s.symbol.rarity
+                }))}
                 onComplete={() => {
                   console.log('🎰 Reel animation completed, transitioning to revealing')
                   

@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
       }
 
       user = newUser
-      console.log('✅ New user created:', user.id)
+      console.log('✅ New user created:', newUser?.id || 'unknown')
     }
 
     // Ensure user exists at this point

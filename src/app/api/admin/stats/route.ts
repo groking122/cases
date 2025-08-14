@@ -15,6 +15,14 @@ export async function GET(request: NextRequest) {
       }, { status: 401 })
     }
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     // Get basic counts from tables
     const { count: totalCases } = await supabase
       .from('cases')
@@ -50,8 +58,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get top performing case
-    let topPerformingCase = {
-      id: null,
+    let topPerformingCase: { id: string; name: string; openings: number } = {
+      id: '',
       name: 'No data',
       openings: 0
     }

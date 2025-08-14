@@ -27,6 +27,14 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const status = searchParams.get('status') // 'active', 'inactive', or null for all
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     let query = supabase
       .from('cases')
       .select(`
@@ -155,7 +163,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     // Create case in transaction
+    const expectedValue = await calculateExpectedValue(symbols)
+
     const { data: newCase, error: caseError } = await supabase
       .from('cases')
       .insert({
@@ -166,9 +184,9 @@ export async function POST(request: NextRequest) {
         is_active: isActive,
         metadata: {
           totalOpenings: 0,
-          averageValue: calculateExpectedValue(symbols),
+          averageValue: expectedValue,
           lastModified: new Date().toISOString(),
-          modifiedBy: authResult.user.email
+          modifiedBy: authResult.user?.email || 'unknown'
         }
       })
       .select()
@@ -198,8 +216,8 @@ export async function POST(request: NextRequest) {
     // Log admin action
     await logAdminAction({
       action: 'CREATE_CASE',
-      adminId: authResult.user.userId,
-      adminEmail: authResult.user.email,
+      adminId: authResult.user?.userId || 'unknown',
+      adminEmail: authResult.user?.email || 'unknown',
       targetType: 'case',
       targetId: newCase.id,
       changes: { case: body },
@@ -275,6 +293,9 @@ function validateProbabilities(symbols: Array<{ symbolId: string; weight: number
 async function calculateExpectedValue(symbols: Array<{ symbolId: string; weight: number }>): Promise<number> {
   // Get symbol values from database
   const symbolIds = symbols.map(s => s.symbolId)
+  if (!supabase) {
+    return 0
+  }
   const { data: symbolData } = await supabase
     .from('symbols')
     .select('id, value')
@@ -306,6 +327,9 @@ async function logAdminAction(params: {
   // Implementation similar to auth route
   const checksum = await generateChecksum(params)
   
+  if (!supabase) {
+    return
+  }
   await supabase.from('admin_audit_logs').insert({
     action: params.action,
     admin_id: params.adminId,

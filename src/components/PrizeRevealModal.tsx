@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import SymbolRenderer from "./SymbolRenderer"
 
 interface Skin {
   id: string
@@ -140,28 +141,44 @@ export function PrizeRevealModal({
             {/* Prize Display */}
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.4, type: "spring", damping: 20 }}
+            animate={{ scale: [0.8, 1.08, 1], opacity: 1 }}
+            transition={{ delay: 0.4, duration: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
               className="text-center mb-8"
             >
               {/* Prize Image/Symbol */}
-              <div className={`mx-auto w-32 h-32 rounded-3xl bg-gradient-to-br ${getRarityColor(wonSkin.rarity)} 
+              <div className={`mx-auto rounded-3xl bg-gradient-to-br ${getRarityColor(wonSkin.rarity)} 
                 ${getRarityGlow(wonSkin.rarity)} ${getRarityBorder(wonSkin.rarity)} border-2 
-                flex items-center justify-center mb-4 relative overflow-hidden`}>
-                
-                {/* Shimmer effect */}
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
-                  animate={{ x: [-100, 200] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                flex items-center justify-center mb-4 relative overflow-hidden p-3`}>
+                <SymbolRenderer
+                  symbol={{
+                    id: wonSkin.id,
+                    name: wonSkin.name,
+                    emoji: "🎁",
+                    imageUrl: wonSkin.image_url,
+                    rarity: wonSkin.rarity
+                  }}
+                  size={120}
+                  revealAnimation
                 />
-                
-                <div className="text-5xl z-10">
-                  {wonSkin.rarity === 'legendary' ? '👑' : 
-                   wonSkin.rarity === 'epic' ? '💎' : 
-                   wonSkin.rarity === 'rare' ? '⭐' : 
-                   wonSkin.rarity === 'uncommon' ? '🔮' : '💰'}
-                </div>
+                {/* Sparkles for rare+ */}
+                {['rare','epic','legendary','mythic'].includes(wonSkin.rarity) && (
+                  <motion.div
+                    className="pointer-events-none absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 1.6, repeat: 1 }}
+                  >
+                    {[...Array(10)].map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className="absolute w-1 h-1 bg-white rounded-full"
+                        style={{ left: `${Math.random()*100}%`, top: `${Math.random()*100}%` }}
+                        animate={{ scale: [0, 1.6, 0], opacity: [0, 1, 0] }}
+                        transition={{ duration: 0.9 + Math.random()*0.6, delay: Math.random()*0.4 }}
+                      />
+                    ))}
+                  </motion.div>
+                )}
               </div>
 
               {/* Prize Details */}

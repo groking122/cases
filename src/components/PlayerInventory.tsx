@@ -16,6 +16,7 @@ interface InventoryItem {
   is_withdrawn: boolean
   withdrawal_type?: 'credits'
   withdrawal_tx_hash?: string
+  eligible_for_nft?: boolean
 }
 
 interface PlayerInventoryProps {
@@ -32,6 +33,7 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
   const [rarityFilter, setRarityFilter] = useState<string>('all')
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [selling, setSelling] = useState<string | null>(null)
+  const [minting, setMinting] = useState<string | null>(null)
   const [justSold, setJustSold] = useState<string | null>(null)
 
   // Fetch player inventory
@@ -57,6 +59,84 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
       console.error('Failed to fetch inventory:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Resolve userId from connected wallet
+  const resolveUserId = async (): Promise<string | null> => {
+    try {
+      if (!connected || !wallet) return null
+      const addresses = await wallet.getUsedAddresses()
+      const walletAddress = addresses[0]
+      const userRes = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress, walletType: 'mesh_connected' })
+      })
+      if (!userRes.ok) return null
+      const data = await userRes.json()
+      return data.user?.id || null
+    } catch {
+      return null
+    }
+  }
+
+  // Mint as NFT (idempotent, server validates eligibility and ownership)
+  const handleMintAsNFT = async (item: InventoryItem) => {
+    if (minting || item.is_withdrawn) return
+    setMinting(item.id)
+
+    try {
+      const userId = await resolveUserId()
+      if (!userId) {
+        alert('Unable to verify user. Please reconnect your wallet and try again.')
+        setMinting(null)
+        return
+      }
+
+      const idempotencyKey = (globalThis.crypto as any)?.randomUUID?.() || `${item.id}-${Date.now()}`
+      const res = await fetch('/api/withdraw-nft', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey
+        },
+        body: JSON.stringify({ caseOpeningId: item.id, userId })
+      })
+
+      let data: any = null
+      const ct = res.headers.get('content-type') || ''
+      if (ct.includes('application/json')) {
+        data = await res.json()
+      } else {
+        const raw = await res.text()
+        console.error('Non-JSON response from /api/withdraw-nft:', raw)
+        alert('Mint failed. Server returned an unexpected response.')
+        setMinting(null)
+        return
+      }
+
+      if (!res.ok || !data?.success) {
+        const msg = data?.error || 'Mint failed. Item may be ineligible.'
+        alert(msg)
+        setMinting(null)
+        return
+      }
+
+      // Optimistically mark withdrawn with NFT
+      setInventory(prev => prev.map(invItem =>
+        invItem.id === item.id
+          ? { ...invItem, is_withdrawn: true, withdrawal_type: 'nft', withdrawal_tx_hash: data.txHash }
+          : invItem
+      ))
+
+      setSelectedItem(null)
+      alert(`NFT minted! Tx: ${data.txHash}`)
+    } catch (e: any) {
+      console.error('Mint NFT error', e)
+      alert('Mint failed. Please try again later.')
+    } finally {
+      setMinting(null)
     }
   }
 
@@ -431,7 +511,7 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
 
                     {!selectedItem.is_withdrawn && (
                       <div className="space-y-3">
-                        <h4 className="text-white font-semibold">Sell Item:</h4>
+                        <h4 className="text-white font-semibold">Sell or Withdraw:</h4>
                         <Button
                           onClick={() => {
                             if (!selling && !selectedItem.is_withdrawn) {
@@ -445,11 +525,23 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                            selectedItem.is_withdrawn ? '✅ Already Sold' :
                            `💰 Sell for ${selectedItem.reward_value} Credits`}
                         </Button>
+                        {selectedItem.eligible_for_nft && (
+                        <Button
+                          onClick={() => {
+                            if (!minting && !selectedItem.is_withdrawn) {
+                              handleMintAsNFT(selectedItem)
+                            }
+                          }}
+                          className="w-full bg-purple-600 hover:bg-purple-700"
+                          disabled={!!minting || selectedItem.is_withdrawn}
+                        >
+                          {minting === selectedItem.id ? '⚙️ Minting...' : '🖼️ Mint as NFT'}
+                        </Button>
+                        )}
                         <p className="text-xs text-gray-500 text-center">
-                          {selectedItem.is_withdrawn ? 
-                            'This item has already been sold.' :
-                            'Selling converts this item to credits instantly and adds them to your balance.'
-                          }
+                          {selectedItem.is_withdrawn
+                            ? 'This item has already been withdrawn.'
+                            : 'Sell for credits instantly, or mint as an NFT to your wallet (eligible items only).'}
                         </p>
                       </div>
                     )}

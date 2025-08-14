@@ -60,6 +60,14 @@ export async function PATCH(
       }, { status: 400 })
     }
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     // Debug: Check if case exists before attempting update (no .single())
     const { data: existingCaseCheck, error: checkError } = await supabase
       .from('cases')
@@ -200,7 +208,7 @@ export async function PATCH(
     }
 
     // Log admin action (placeholder - implement if needed)
-    console.log('✅ Admin action: UPDATE_CASE', { caseId, user: authResult.user.email })
+    console.log('✅ Admin action: UPDATE_CASE', { caseId, user: authResult.user?.email || 'unknown' })
 
     // Map the response to match frontend expectations
     const mappedCase = {
@@ -252,6 +260,14 @@ export async function DELETE(
 
     const { id: caseId } = await params
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     // Delete case (cascade will handle case_symbols)
     const { error } = await supabase
       .from('cases')
@@ -263,7 +279,7 @@ export async function DELETE(
     }
 
     // Log admin action (placeholder - implement if needed)
-    console.log('Admin action: DELETE_CASE', { caseId, user: authResult.user.email })
+    console.log('Admin action: DELETE_CASE', { caseId, user: authResult.user?.email || 'unknown' })
 
     return NextResponse.json<AdminApiResponse>({
       success: true,

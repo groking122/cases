@@ -27,12 +27,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Get all case openings for this user
-    const { data: caseOpenings, error: openingsError } = await supabaseAdmin
+    // Get all case openings for this user with symbol info
+    // Try join via symbol_id -> symbols. If FK not present in schema cache, fall back to separate fetch
+    let caseOpenings: any[] | null = null
+    let openingsError: any = null
+    const joinAttempt = await supabaseAdmin
       .from('case_openings')
-      .select('*')
+      .select(`*`)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
+    if (!joinAttempt.error) {
+      caseOpenings = joinAttempt.data
+    } else {
+      openingsError = joinAttempt.error
+    }
 
     if (openingsError) {
       console.error('Error fetching case openings:', openingsError);
@@ -45,6 +53,19 @@ export async function POST(request: NextRequest) {
     const { SYMBOL_CONFIG } = await import('@/lib/symbols');
 
     // Transform the data for frontend consumption
+    // fetch symbol withdrawable map (fallback) if needed
+    let symbolWithdrawMap = new Map<string, boolean>()
+    if (caseOpenings && caseOpenings.length > 0) {
+      const ids = Array.from(new Set(caseOpenings.map((o: any) => o.symbol_id).filter(Boolean)))
+      if (ids.length > 0) {
+        const { data: syms } = await supabaseAdmin
+          .from('symbols')
+          .select('id, withdrawable')
+          .in('id', ids)
+        syms?.forEach((s: any) => symbolWithdrawMap.set(s.id, !!s.withdrawable))
+      }
+    }
+
     const inventory = (caseOpenings || []).map(opening => {
       // First, try to get the symbol key from the API response structure
       let symbolKey = opening.symbol_key || 'coin'; // Use stored key or fallback
@@ -94,6 +115,7 @@ export async function POST(request: NextRequest) {
 
       console.log(`📦 Mapping item: ${opening.symbol_name || 'Unknown'} -> ${symbolKey} (${symbolName})`);
 
+      const withdrawable = symbolWithdrawMap.get(opening.symbol_id) === true
       return {
         id: opening.id,
         symbol_key: symbolKey,
@@ -103,7 +125,8 @@ export async function POST(request: NextRequest) {
         created_at: opening.created_at,
         is_withdrawn: opening.is_withdrawn || false,
         withdrawal_type: opening.withdrawal_type,
-        withdrawal_tx_hash: opening.withdrawal_tx_hash
+        withdrawal_tx_hash: opening.withdrawal_tx_hash,
+        eligible_for_nft: withdrawable || (opening.reward_value || 0) >= 500
       };
     });
 

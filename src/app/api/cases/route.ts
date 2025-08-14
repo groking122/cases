@@ -11,12 +11,18 @@ export async function GET(request: NextRequest) {
     try {
         console.log('📦 Fetching all active cases from DB...');
 
-        // 2. Fetch all cases that are marked as "active"
+        // 2. Fetch all cases that are marked as active with symbols
         const { data: cases, error } = await supabaseAdmin
             .from('cases')
-            .select('*')
-            .eq('active', true) // Only fetch cases that are ready for production
-            .order('price', { ascending: true }); // Order by price
+            .select(`
+              *,
+              case_symbols (
+                weight,
+                symbols (* )
+              )
+            `)
+            .eq('is_active', true)
+            .order('price', { ascending: true });
 
         // 3. Handle database errors
         if (error) {
@@ -24,33 +30,34 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Failed to fetch cases. Please try again later.' }, { status: 500 });
         }
 
-        // 4. If no active cases are found, return an empty array
-        if (!cases) {
-            console.log('⚠️ No active cases found in the database.');
-            return NextResponse.json({ success: true, cases: [] });
-        }
+        // 4. Transform cases and include mapped symbols for the reel filler pool
+        const mapped = (cases || []).map(c => ({
+            id: c.id,
+            name: c.name,
+            description: c.description,
+            price: c.price,
+            image_url: c.image_url,
+            is_active: c.is_active,
+            created_at: c.created_at,
+            updated_at: c.updated_at,
+            symbols: (c.case_symbols || []).map((cs: any) => ({
+              symbolId: cs.symbols?.id,
+              weight: cs.weight,
+              symbol: {
+                key: cs.symbols?.id,
+                name: cs.symbols?.name,
+                imageUrl: cs.symbols?.image_url || null,
+                rarity: cs.symbols?.rarity || 'common'
+              }
+            }))
+        }));
 
-        // 5. Fetch the count of items (skins) for each case
-        const casesWithCounts = await Promise.all(
-            cases.map(async (caseItem) => {
-                const { count, error: countError } = await supabaseAdmin!
-                    .from('case_symbols')
-                    .select('symbol_id', { count: 'exact', head: true })
-                    .eq('case_id', caseItem.id);
+        console.log(`✅ Found ${mapped.length} active cases.`);
 
-                return {
-                    ...caseItem,
-                    skinCount: countError ? 0 : count ?? 0,
-                };
-            })
-        );
-        
-        console.log(`✅ Found ${casesWithCounts.length} active cases.`);
-
-        // 6. Return the successfully fetched cases
+        // 5. Return the successfully fetched cases
         return NextResponse.json({
             success: true,
-            cases: casesWithCounts,
+            cases: mapped,
         });
 
     } catch (error: any) {

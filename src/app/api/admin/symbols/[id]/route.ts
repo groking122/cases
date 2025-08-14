@@ -19,6 +19,13 @@ export async function GET(
     }
 
     const { id } = await params
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
     const { data: symbol, error } = await supabase
       .from('symbols')
       .select('*')
@@ -100,6 +107,13 @@ export async function PATCH(
     // Add tracking fields (only if columns exist)
     updates.updated_at = new Date().toISOString()
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
     const { data: updatedSymbol, error } = await supabase
       .from('symbols')
       .update(updates)
@@ -128,8 +142,8 @@ export async function PATCH(
     // Log admin action
     await logAdminAction({
       action: 'UPDATE_SYMBOL',
-      adminId: authResult.user.userId,
-      adminEmail: authResult.user.email,
+      adminId: authResult.user?.userId || 'unknown',
+      adminEmail: authResult.user?.email || 'unknown',
       targetType: 'symbol',
       targetId: id,
       changes: { updates },
@@ -170,6 +184,14 @@ export async function DELETE(
 
     const { id } = await params
     
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     // Check if symbol is being used in any cases
     const { data: caseSymbols, error: checkError } = await supabase
       .from('case_symbols')
@@ -208,8 +230,8 @@ export async function DELETE(
     // Log admin action
     await logAdminAction({
       action: 'DELETE_SYMBOL',
-      adminId: authResult.user.userId,
-      adminEmail: authResult.user.email,
+      adminId: authResult.user?.userId || 'unknown',
+      adminEmail: authResult.user?.email || 'unknown',
       targetType: 'symbol',
       targetId: id,
       changes: { deletedSymbol: symbolData },
@@ -245,6 +267,9 @@ async function logAdminAction(params: {
   try {
     const checksum = await generateChecksum(params)
     
+    if (!supabase) {
+      return
+    }
     await supabase.from('admin_audit_logs').insert({
       action: params.action,
       admin_id: params.adminId,

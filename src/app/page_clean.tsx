@@ -808,7 +808,6 @@ export default function Home() {
               </div>
             </motion.div>
           )}
-        </div>
 
         {/* Professional Prize Reveal Modal */}
         <PrizeRevealModal
@@ -822,7 +821,6 @@ export default function Home() {
           onClose={() => setShowInventory(false)}
           onCreditsUpdated={handleInventoryCreditsUpdated}
         />
-
 
         <AnimatePresence>
           {showPaymentRecovery && (

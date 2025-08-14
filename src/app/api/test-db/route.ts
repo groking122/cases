@@ -71,22 +71,22 @@ export async function GET() {
                 users: {
                     accessible: !usersError,
                     count: users?.length || 0,
-                    error: usersError?.message || null
+                    error: usersError ? (usersError as any).message : null
                 },
                 cases: {
                     accessible: !casesError,
                     count: cases?.length || 0,
-                    error: casesError?.message || null
+                    error: casesError ? (casesError as any).message : null
                 },
                 symbols: {
                     accessible: !symbolsError,
                     count: symbols?.length || 0,
-                    error: symbolsError?.message || null
+                    error: symbolsError ? (symbolsError as any).message : null
                 },
                 case_symbols: {
                     accessible: !caseSymbolsError,
                     count: caseSymbols?.length || 0,
-                    error: caseSymbolsError?.message || null
+                    error: caseSymbolsError ? (caseSymbolsError as any).message : null
                 }
             },
             environment: {

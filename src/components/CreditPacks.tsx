@@ -22,7 +22,7 @@ const CREDIT_PACKS: CreditPack[] = [
 interface CreditPacksProps {
   walletAddress: string
   onCreditsUpdated: (newCredits: number) => void
-  selectedWallet: any
+  selectedWallet?: unknown
   onPurchaseSuccess?: (credits: number, txHash: string) => void
   onError?: (error: string) => void
 }
@@ -30,35 +30,42 @@ interface CreditPacksProps {
 export default function CreditPacks({ 
   walletAddress, 
   onCreditsUpdated, 
-  selectedWallet,
+
   onPurchaseSuccess, 
   onError 
 }: CreditPacksProps) {
   const { connected, wallet, connect, connecting } = useWallet()
   const [purchasing, setPurchasing] = useState<number | null>(null)
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  const [canHover, setCanHover] = useState<boolean>(true)
 
   // Debug wallet connection state
   useEffect(() => {
     console.log('CreditPacks - Wallet State:', { connected, wallet: !!wallet, connecting })
   }, [connected, wallet, connecting])
 
-  // Add debug function for troubleshooting
-  const debugEnvironment = () => {
-    console.log('🔍 DEBUG - Environment Check:')
-    console.log('Payment address:', process.env.NEXT_PUBLIC_PAYMENT_ADDRESS ? 'SET' : '❌ MISSING')
-    console.log('Address length:', process.env.NEXT_PUBLIC_PAYMENT_ADDRESS?.length || 0)
-    console.log('Wallet connected:', connected)
-    console.log('Wallet object:', !!wallet)
-    console.log('Current purchasing:', purchasing)
-  }
+  // Detect hover capability to avoid hover animations on touch devices
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) {
+      setCanHover(true)
+      return
+    }
+    const mq = window.matchMedia('(hover: hover)')
+    const update = () => setCanHover(!!mq.matches)
+    update()
+    mq.addEventListener?.('change', update)
+    return () => mq.removeEventListener?.('change', update)
+  }, [])
+
+
 
   // Handle wallet connection using the wallet selector
   const handleWalletSelect = async (walletKey: string) => {
     try {
       await connect(walletKey)
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (onError) {
-        onError(`Wallet connection failed: ${error.message || 'Unknown error'}`)
+        onError(`Wallet connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
       } else {
         console.error('Wallet connection failed:', error)
       }
@@ -76,6 +83,7 @@ export default function CreditPacks({
 
   const handlePurchase = async (pack: CreditPack) => {
     console.log('🛒 Starting instant credit purchase for pack:', pack)
+    setInlineError(null)
     
     if (!connected || !wallet) {
       const errorMsg = 'Please connect your wallet first'
@@ -84,6 +92,7 @@ export default function CreditPacks({
       } else {
         console.error(errorMsg)
       }
+      setInlineError(errorMsg)
       return
     }
 
@@ -136,7 +145,7 @@ export default function CreditPacks({
         if (adaBalance < pack.price) {
           throw new Error(`Insufficient ADA balance. You have ${adaBalance.toFixed(2)} ADA but need ${pack.price} ADA`)
         }
-      } catch (balanceError: any) {
+      } catch (balanceError: unknown) {
         console.warn('⚠️ Could not check balance:', balanceError)
         // Continue anyway, let the transaction fail if insufficient funds
       }
@@ -158,9 +167,9 @@ export default function CreditPacks({
       try {
         unsignedTx = await tx.build()
         console.log('✅ Unsigned transaction built successfully')
-      } catch (buildError: any) {
+      } catch (buildError: unknown) {
         console.error('❌ Transaction build failed:', buildError)
-        throw new Error(`Transaction build failed: ${buildError.message || buildError}`)
+        throw new Error(`Transaction build failed: ${buildError instanceof Error ? buildError.message : String(buildError)}`)
       }
       
       console.log('✍️ Requesting wallet signature...')
@@ -169,12 +178,12 @@ export default function CreditPacks({
       try {
         signedTx = await wallet.signTx(unsignedTx)
         console.log('✅ Transaction signed successfully')
-      } catch (signError: any) {
+      } catch (signError: unknown) {
         console.error('❌ Transaction signing failed:', signError)
-        if (signError.code === 2) {
+        if (signError && typeof signError === 'object' && 'code' in signError && signError.code === 2) {
           throw new Error('Transaction was cancelled by user')
         }
-        throw new Error(`Transaction signing failed: ${signError.message || signError}`)
+        throw new Error(`Transaction signing failed: ${signError instanceof Error ? signError.message : String(signError)}`)
       }
       
       // SECURITY FIX: Only allow real transactions for credit purchases
@@ -196,18 +205,19 @@ export default function CreditPacks({
           throw new Error('Test transactions are not allowed for credit purchases')
         }
         
-      } catch (submitError: any) {
+      } catch (submitError: unknown) {
         console.error('❌ Transaction submission failed:', submitError)
         
         // Provide specific error messages for common issues
-        if (submitError.message?.includes('insufficient')) {
+        const errorMessage = submitError instanceof Error ? submitError.message : String(submitError)
+        if (errorMessage.includes('insufficient')) {
           throw new Error('Insufficient ADA to cover transaction and fees')
-        } else if (submitError.message?.includes('network')) {
+        } else if (errorMessage.includes('network')) {
           throw new Error('Network connection issue. Please check your internet and try again.')
-        } else if (submitError.code === 1) {
+        } else if (submitError && typeof submitError === 'object' && 'code' in submitError && submitError.code === 1) {
           throw new Error('Transaction was rejected by the network. Please try again.')
         } else {
-          throw new Error(`Transaction submission failed: ${submitError.message || 'Unknown blockchain error'}`)
+          throw new Error(`Transaction submission failed: ${errorMessage || 'Unknown blockchain error'}`)
         }
       }
 
@@ -242,9 +252,9 @@ export default function CreditPacks({
             const errorData = await verificationResponse.json()
             throw new Error(errorData.error || 'Payment verification failed')
           }
-        } catch (verifyError: any) {
+        } catch (verifyError: unknown) {
           if (retryCount === maxRetries - 1) {
-            throw new Error(`Payment verification failed after ${maxRetries} attempts: ${verifyError.message}`)
+            throw new Error(`Payment verification failed after ${maxRetries} attempts: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`)
           }
           retryCount++
           await new Promise(resolve => setTimeout(resolve, (2 ** retryCount) * 1000))
@@ -294,7 +304,7 @@ export default function CreditPacks({
         
         const creditResult = await addCreditsResponse.json()
         console.log('✅ Credits added successfully!', creditResult)
-      } catch (creditsError: any) {
+      } catch (creditsError: unknown) {
         console.error('❌ Credits addition failed:', creditsError)
         
         // Even if credits failed to add, we should inform user the payment went through
@@ -304,6 +314,7 @@ export default function CreditPacks({
         } else {
           console.error(errorMsg)
         }
+        setInlineError(errorMsg)
         setPurchasing(null)
         return
       }
@@ -337,29 +348,30 @@ export default function CreditPacks({
         onPurchaseSuccess(pack.credits, txHash)
       }
       setPurchasing(null)
+      setInlineError(null)
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Credit purchase error occurred!')
       console.error('Full error object:', error)
       console.error('Error type:', typeof error)
       console.error('Error details:', {
-        message: error?.message,
-        code: error?.code,
-        info: error?.info,
-        name: error?.name,
-        stack: error?.stack?.substring(0, 300)
+        message: error instanceof Error ? error.message : 'Unknown',
+        type: typeof error,
+        value: String(error)
       })
       
       let errorMessage = 'Failed to purchase credits'
       
-      if (error?.message) {
+      if (error instanceof Error) {
         errorMessage = error.message
-      } else if (error?.info) {
-        errorMessage = `Transaction error: ${error.info}`
-      } else if (error?.code) {
-        errorMessage = `Error code: ${error.code}`
       } else if (typeof error === 'string') {
         errorMessage = error
+      } else if (error && typeof error === 'object') {
+        if ('info' in error && typeof error.info === 'string') {
+          errorMessage = `Transaction error: ${error.info}`
+        } else if ('code' in error) {
+          errorMessage = `Error code: ${String(error.code)}`
+        }
       }
       
       if (onError) {
@@ -367,6 +379,7 @@ export default function CreditPacks({
       } else {
         console.error('Purchase error:', errorMessage)
       }
+      setInlineError(errorMessage)
       setPurchasing(null)
     }
   }
@@ -389,19 +402,10 @@ export default function CreditPacks({
         <h2 className="text-xl font-bold text-white mb-2">Choose Your Credit Pack</h2>
         <p className="text-gray-400">Click to purchase instantly with your connected wallet</p>
         
-        {/* Debug Button for Development */}
-        {process.env.NODE_ENV === 'development' && (
-          <button
-            onClick={debugEnvironment}
-            className="mt-2 text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded"
-            title="Debug environment and wallet status"
-          >
-            🐛 Debug Purchase Issues
-          </button>
-        )}
+
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="flex flex-col md:flex-row gap-4 justify-center items-stretch">
         {CREDIT_PACKS.map((pack, index) => {
           const discount = calculateDiscount(pack)
           const isPurchasing = purchasing === pack.id
@@ -412,54 +416,57 @@ export default function CreditPacks({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className={`relative bg-gray-900/50 border rounded-xl p-6 space-y-4 ${
+              whileHover={canHover ? { scale: 1.02, y: -5 } : undefined}
+              className={`relative bg-gray-800/40 border border-orange-600/30 rounded-xl p-6 flex-1 max-w-sm flex flex-col min-h-[320px] cursor-pointer transition-all duration-300 ${
                 discount > 0 
-                  ? 'border-purple-500/50 bg-gradient-to-br from-purple-900/20 to-pink-900/20' 
-                  : 'border-gray-700'
-              }`}
+                  ? 'border-orange-600/60 bg-gradient-to-br from-orange-900/20 to-gray-900/40 shadow-lg shadow-orange-600/10' 
+                  : 'bg-gradient-to-br from-gray-800/40 to-gray-900/60 hover:border-orange-600/50'
+              } ${isPurchasing ? 'opacity-75 cursor-not-allowed' : ''}`}
             >
+              {/* Discount badge - top-right */}
+              <div className="absolute top-2 right-2">
+                <div className="bg-emerald-500/20 border border-emerald-500/30 rounded-md px-2 py-1">
+                  <span className="text-emerald-400 text-xs font-semibold">
+                    {discount > 0 ? `${discount}% OFF` : 'STANDARD'}
+                  </span>
+                </div>
+              </div>
               {/* Best Value Badge */}
               {discount >= 30 && (
                 <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                  <div className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
                     BEST VALUE
                   </div>
                 </div>
               )}
 
-              <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-1">
-                  {pack.credits} Credits
-                </div>
-                <div className="text-gray-400 text-sm mb-2">
-                  = {pack.credits / 100} Case Opening{(pack.credits / 100) > 1 ? 's' : ''}
-                </div>
-                
-                {discount > 0 && (
-                  <div className="bg-green-500/20 border border-green-500/30 rounded-lg px-2 py-1 mb-3">
-                    <span className="text-green-400 text-sm font-semibold">
-                      {discount}% OFF
-                    </span>
+              <div className="text-center flex-grow flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="text-3xl font-bold text-white">
+                    {pack.credits.toLocaleString()} Credits
                   </div>
-                )}
-              </div>
-
-              <div className="text-center space-y-2">
-                <div className="text-2xl font-bold text-blue-400">
-                  {pack.price} ADA
+                  <div className="text-gray-400 text-sm">
+                    = {pack.credits / 100} Case Opening{(pack.credits / 100) > 1 ? 's' : ''}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {(pack.price / (pack.credits / 100)).toFixed(2)} ADA per case
+
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold text-orange-400">
+                    {pack.price} ADA
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {(pack.price / (pack.credits / 100)).toFixed(2)} ADA per case
+                  </div>
                 </div>
               </div>
 
               <Button
                 onClick={() => handlePurchase(pack)}
                 disabled={isPurchasing}
-                className={`w-full h-12 font-semibold ${
+                className={`w-full h-12 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 ${
                   discount > 0
-                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
-                    : 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700'
+                    ? 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600'
+                    : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-700 hover:to-orange-600'
                 } transition-all duration-300`}
               >
                 {isPurchasing ? (
@@ -471,14 +478,32 @@ export default function CreditPacks({
                   `Buy ${pack.credits} Credits - ${pack.price} ADA`
                 )}
               </Button>
+
+              {/* Processing overlay */}
+              {isPurchasing && (
+                <div className="absolute inset-0 rounded-xl bg-black/50 flex items-center justify-center">
+                  <div className="text-white text-sm">Authorizing...</div>
+                </div>
+              )}
             </motion.div>
           )
         })}
       </div>
 
-      <div className="text-center text-xs text-gray-500">
-        <div>💡 Credits never expire and can be used anytime</div>
-        <div>🔒 All payments are secured on the Cardano blockchain</div>
+      {/* Inline error message */}
+      {inlineError && (
+        <div className="text-center text-red-400 text-sm">{inlineError}</div>
+      )}
+
+      <div className="flex items-center justify-center gap-6 text-xs text-gray-500">
+        <div className="flex items-center gap-1">
+          <span className="text-orange-400">💡</span>
+          <span>Credits never expire</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-orange-400">🔒</span>
+          <span>Blockchain secured</span>
+        </div>
       </div>
     </div>
   )

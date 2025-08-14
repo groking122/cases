@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Button } from "@/components/ui/button"
+
 import toast from 'react-hot-toast'
 import WalletBalance from "@/components/WalletBalance"
-import CreditPacks from "@/components/CreditPacks"
+
 import WalletSelector from "@/components/WalletSelector"
 import PlayerInventory from "@/components/PlayerInventory"
 import { PrizeRevealModal } from "@/components/PrizeRevealModal"
@@ -13,6 +13,7 @@ import { useWallet } from '@meshsdk/react'
 import { useRouter } from 'next/navigation'
 import { useDeviceCapabilities } from "@/hooks/useDeviceCapabilities"
 import type { CaseOpening } from "@/types/database"
+import Link from 'next/link'
 
 
 interface Skin {
@@ -45,7 +46,20 @@ export default function Home() {
   const [isOpening, setIsOpening] = useState(false)
   const [openedSkin, setOpenedSkin] = useState<Skin | null>(null)
   const [showPrizeModal, setShowPrizeModal] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+
+  const casePrice = 100;
+  
+  // Professional casino-grade device detection
+  const {
+    capabilities: deviceCapabilities,
+    isMobile,
+    canUseComplexEffects,
+    maxParticles,
+    targetFPS
+  } = useDeviceCapabilities()
+  
+  // Case Result and Credits with API sync (stats only for UI)
   const [gameStats, setGameStats] = useState({
     casesOpened: 0,
     totalWon: 0,
@@ -53,23 +67,6 @@ export default function Home() {
     legendaryCount: 0,
     epicCount: 0
   })
-  const casePrice = 100;
-  
-  // Professional casino-grade device detection
-  const {
-    capabilities: deviceCapabilities,
-    performanceSettings,
-    isLowEnd,
-    isMobile,
-    canUseComplexEffects,
-    maxParticles,
-    targetFPS
-  } = useDeviceCapabilities()
-  
-  // Case Result and Credits with API sync
-  const [caseResult, setCaseResult] = useState<CaseOpeningResult | null>(null)
-  const [apiResult, setApiResult] = useState<any>(null)
-  // Remove creditsClaimed state since credits are automatically added by API
   
   // Credit System
   const [userCredits, setUserCredits] = useState<UserCredits>({ credits: 0, loading: false })
@@ -78,75 +75,29 @@ export default function Home() {
   // Inventory System
   const [showInventory, setShowInventory] = useState(false)
   
-  // Payment Recovery System
-  const [showPaymentRecovery, setShowPaymentRecovery] = useState(false)
-  
-  // Professional Mystery Box State
-  const [showEnhancedBox, setShowEnhancedBox] = useState(false)
+  // Payment Recovery System (removed unused state)
+  // Professional Mystery Box State (removed unused state)
   
   const [userId, setUserId] = useState<string | null>(null);
   
   // Dynamic case management
-  const [availableCases, setAvailableCases] = useState<any[]>([]);
-  const [selectedCase, setSelectedCase] = useState<any | null>(null);
-  const [casesLoading, setCasesLoading] = useState(true);
+  const [availableCases, setAvailableCases] = useState<any[]>([])
+  const [selectedCase, setSelectedCase] = useState<any | null>(null)
+  const [casesLoading, setCasesLoading] = useState(true)
 
   // Credits popup state
   const [showCreditsPopup, setShowCreditsPopup] = useState(false)
   
-  // Instant credit purchase state
-  const [showInstantPurchase, setShowInstantPurchase] = useState(false)
 
-  // Handle case opening
-  const handleOpenCase = useCallback(async () => {
-    if (!selectedCase || isOpening || userCredits.credits < selectedCase.price) return;
-    
-    setIsOpening(true);
-    try {
-      const response = await fetch('/api/open-case-credits', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          caseId: selectedCase.id,
-          userId: userId || 'demo-user'
-        }),
-      });
 
-      const result = await response.json();
-      if (result.success) {
-        // Update credits
-        setUserCredits(prev => ({ ...prev, credits: result.newBalance }));
-        
-        // Show the prize
-        setOpenedSkin({
-          id: result.symbol.key,
-          name: result.symbol.name,
-          rarity: result.symbol.rarity,
-          value: result.symbol.value,
-          image_url: result.symbol.image_url || '',
-          description: `${result.symbol.rarity} item`,
-        });
-        setShowPrizeModal(true);
-        
-        // Update stats
-        setGameStats(prev => ({
-          ...prev,
-          casesOpened: prev.casesOpened + 1,
-          totalSpent: prev.totalSpent + selectedCase.price,
-          totalWon: prev.totalWon + result.symbol.value,
-        }));
-      } else {
-        toast.error(result.error || 'Failed to open case');
-      }
-    } catch (error) {
-      console.error('Case opening error:', error);
-      toast.error('Something went wrong!');
-    } finally {
-      setIsOpening(false);
+  // Handle case opening - navigate to dedicated open page
+  const handleOpenCase = useCallback(() => {
+    if (!selectedCase) {
+      toast.error('Please select a case to open')
+      return
     }
-  }, [selectedCase, isOpening, userCredits.credits, userId]);
+    router.push(`/open/${selectedCase.id}`)
+  }, [selectedCase, router])
 
   // Real API call for professional mystery box (replaces mockCasinoAPI)
   const realCasinoAPI = useCallback(async (): Promise<any> => {
@@ -295,8 +246,8 @@ export default function Home() {
     updateCreditsInstantly(expectedCreditsAfterSpend)
     
     setIsOpening(true)
-    setShowEnhancedBox(true)
-    setError(null)
+    // setShowEnhancedBox(true) // Removed unused state
+    // setError(null) // Removed unused state
   }
 
   // Handle professional mystery box completion
@@ -438,12 +389,7 @@ export default function Home() {
   const resetGame = () => {
     setOpenedSkin(null)
     setShowPrizeModal(false)
-    setCaseResult(null)
-    setApiResult(null)
-    // Remove creditsClaimed state since credits are automatically added by API
-    setError(null)
     setIsOpening(false)
-    setShowEnhancedBox(false)
     
     // Professional cleanup
     AnimationPool.forceGarbageCollection()
@@ -464,13 +410,12 @@ export default function Home() {
   const handleCreditPurchaseSuccess = (credits: number, txHash: string) => {
     console.log('💰 Credits purchased successfully:', credits, txHash)
     fetchUserCredits() // Refresh user credits
-    setShowInstantPurchase(false)
     toast.success(`Successfully purchased ${credits} credits!`)
   }
 
   // Handle instant purchase open
   const handleInstantPurchaseOpen = () => {
-    setShowInstantPurchase(true)
+    router.push('/credits')
   }
 
   // Show wallet connection screen if not connected
@@ -527,13 +472,9 @@ export default function Home() {
             >
               Cases
             </motion.a>
-            <motion.a 
-              href="#inventory" 
-              className="text-gray-300 hover:text-white transition-colors"
-              whileHover={{ scale: 1.1 }}
-            >
-              Inventory
-            </motion.a>
+            <Link href="/inventory" className="text-gray-300 hover:text-white transition-colors">
+              <motion.span whileHover={{ scale: 1.1 }}>Inventory</motion.span>
+            </Link>
             <motion.a 
               href="#leaderboard" 
               className="text-gray-300 hover:text-white transition-colors"
@@ -585,7 +526,7 @@ export default function Home() {
           {/* Mobile Menu Button & Credits */}
           <div className="md:hidden flex items-center gap-2">
             <motion.button 
-              onClick={() => setShowInstantPurchase(true)}
+              onClick={() => router.push('/credits')}
               className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-3 py-1 rounded-lg font-bold text-sm"
               whileHover={{ scale: 1.05 }}
             >
@@ -693,10 +634,10 @@ export default function Home() {
 
       {/* Available Cases Section */}
       <section id="cases" className="py-20 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900 to-black"></div>
         <div className="relative max-w-7xl mx-auto px-4">
           <motion.h2 
-            className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent"
+            className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent"
             initial={{ y: 50, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
@@ -708,15 +649,15 @@ export default function Home() {
             {availableCases.map((caseItem, index) => (
               <motion.div
                 key={caseItem.id}
-                className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 border border-gray-700 hover:border-blue-500 transition-all duration-300 group cursor-pointer"
+                className="bg-black/40 backdrop-blur-md rounded-2xl p-6 border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group cursor-pointer"
                 initial={{ y: 50, opacity: 0 }}
                 whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
                 whileHover={{ scale: 1.05, y: -10 }}
-                onClick={() => setSelectedCase(caseItem)}
+                onClick={() => router.push(`/open/${caseItem.id}`)}
               >
-                <div className="h-48 bg-gradient-to-br from-blue-900/50 to-purple-900/50 rounded-xl mb-4 flex items-center justify-center relative overflow-hidden">
+                <div className="h-48 bg-gradient-to-br from-orange-900/40 to-red-900/40 rounded-xl mb-4 flex items-center justify-center relative overflow-hidden">
                   <motion.div
                     className="text-4xl"
                     animate={{ 
@@ -734,7 +675,7 @@ export default function Home() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 </div>
                 
-                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">
+                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">
                   {caseItem.name}
                 </h3>
                 <p className="text-gray-400 text-sm mb-4">{caseItem.description}</p>
@@ -744,9 +685,10 @@ export default function Home() {
                     {caseItem.price}
                   </span>
                   <motion.button
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-lg font-medium"
+                    className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-4 py-2 rounded-lg font-medium"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={(e) => { e.stopPropagation(); router.push(`/open/${caseItem.id}`) }}
                   >
                     Open Case
                   </motion.button>
@@ -757,75 +699,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Case Opening Animation Section */}
-      <section className="py-20 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/50 to-blue-900/50"></div>
-        <div className="relative max-w-4xl mx-auto px-4 text-center">
-          <motion.h2 
-            className="text-3xl font-bold mb-8 bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent"
-            initial={{ scale: 0.5, opacity: 0 }}
-            whileInView={{ scale: 1, opacity: 1 }}
-            viewport={{ once: true }}
-          >
-            Case Opening Experience
-          </motion.h2>
-          
-          {selectedCase ? (
-            <motion.div
-              className="bg-black/50 backdrop-blur-md rounded-3xl p-8 border border-gray-700"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-            >
-              <h3 className="text-2xl font-bold text-white mb-4">{selectedCase.name}</h3>
-              <div className="mb-8">
-                <motion.div
-                  className="w-48 h-48 mx-auto bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center"
-                  animate={{
-                    rotateY: [0, 360],
-                    scale: [1, 1.1, 1],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                  }}
-                >
-                  <div className="text-2xl font-bold font-jetbrains text-white">CASE</div>
-                </motion.div>
-              </div>
-              
-              <motion.button
-                onClick={() => handleOpenCase()}
-                className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-8 py-3 rounded-xl font-medium text-lg shadow-2xl"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                disabled={isOpening || userCredits.credits < selectedCase.price}
-              >
-                {isOpening ? 'Opening...' : `Open for ${selectedCase.price} Credits`}
-              </motion.button>
-              
-              {userCredits.credits < selectedCase.price && (
-                <motion.p 
-                  className="text-red-400 mt-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  ❌ Not enough credits! Need {selectedCase.price - userCredits.credits} more.
-                </motion.p>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              className="bg-gray-800/50 backdrop-blur-md rounded-3xl p-12 border border-gray-700"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="text-lg font-bold text-blue-400 mb-4 font-jetbrains">SELECT</div>
-              <h3 className="text-xl font-semibold text-gray-300 mb-3">Select a Case Above</h3>
-              <p className="text-gray-400">Choose any case from the collection to begin your opening experience!</p>
-            </motion.div>
-          )}
-        </div>
-      </section>
+      {/* Case Opening Animation Section removed - opening happens on dedicated page */}
 
       {/* Credits Popup */}
       <AnimatePresence>
@@ -853,7 +727,7 @@ export default function Home() {
                 <button
                   onClick={() => {
                     setShowCreditsPopup(false)
-                    setShowInstantPurchase(true)
+                    router.push('/credits')
                   }}
                   className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors w-full mb-3"
                 >
@@ -893,44 +767,7 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Instant Credit Purchase Modal */}
-      <AnimatePresence>
-        {showInstantPurchase && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
-            onClick={() => setShowInstantPurchase(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-black/90 backdrop-blur-md rounded-2xl p-6 max-w-2xl w-full border border-gray-700"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-white">Quick Credit Purchase</h3>
-                <button
-                  onClick={() => setShowInstantPurchase(false)}
-                  className="text-gray-400 hover:text-white text-xl transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <CreditPacks
-                walletAddress={connected && wallet ? 'connected' : ''}
-                onCreditsUpdated={(credits) => setUserCredits(prev => ({ ...prev, credits }))}
-                selectedWallet={wallet}
-                onPurchaseSuccess={handleCreditPurchaseSuccess}
-                onError={(error) => toast.error(error)}
-              />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
     </div>
   )
 }

@@ -22,6 +22,14 @@ export async function GET(request: NextRequest) {
     const rarity = searchParams.get('rarity')
     const status = searchParams.get('status') // 'active', 'inactive', or null
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     let query = supabase
       .from('symbols')
       .select('*')
@@ -128,6 +136,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    if (!supabase) {
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: 'Database configuration error',
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     // Create symbol
     const { data: newSymbol, error } = await supabase
       .from('symbols')
@@ -138,10 +154,10 @@ export async function POST(request: NextRequest) {
         rarity,
         value: parseFloat(value),
         is_active: isActive !== false,
-        created_by: authResult.user.userId,
+        created_by: authResult.user?.userId || 'unknown',
         metadata: {
           createdVia: 'admin_dashboard',
-          createdBy: authResult.user.email
+          createdBy: authResult.user?.email || 'unknown'
         }
       })
       .select()
@@ -154,8 +170,8 @@ export async function POST(request: NextRequest) {
     // Log admin action
     await logAdminAction({
       action: 'CREATE_SYMBOL',
-      adminId: authResult.user.userId,
-      adminEmail: authResult.user.email,
+      adminId: authResult.user?.userId || 'unknown',
+      adminEmail: authResult.user?.email || 'unknown',
       targetType: 'symbol',
       targetId: newSymbol.id,
       changes: { symbol: body },
@@ -192,6 +208,9 @@ async function logAdminAction(params: {
   try {
     const checksum = await generateChecksum(params)
     
+    if (!supabase) {
+      return
+    }
     await supabase.from('admin_audit_logs').insert({
       action: params.action,
       admin_id: params.adminId,

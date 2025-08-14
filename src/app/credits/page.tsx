@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { useWallet } from '@meshsdk/react'
 import { useRouter } from 'next/navigation'
@@ -55,13 +55,11 @@ export default function CreditsPage() {
 
   // Handle successful credit purchase
   const handleCreditPurchaseSuccess = (credits: number, txHash: string) => {
-    setUserCredits(prev => ({ 
-      ...prev, 
-      credits: prev.credits + credits 
-    }))
-    setPurchasing(null)
+    console.log('💰 Credit purchase success callback:', credits, 'previous:', userCredits.credits)
+    // Let the fetchUserCredits handle the update to avoid display bugs
     toast.success(`Successfully purchased ${credits} credits!`)
     
+    // Refresh credits from API to get accurate total
     setTimeout(() => {
       fetchUserCredits()
     }, 1000)
@@ -126,8 +124,8 @@ export default function CreditsPage() {
             
             <div className="min-w-[380px]">
               <WalletBalance 
-                externalCredits={userCredits.credits}
-                onCreditsUpdate={handleCreditsUpdate}
+                credits={userCredits.credits}
+                onCreditsChange={handleCreditsUpdate}
               />
             </div>
           </motion.div>
@@ -183,7 +181,7 @@ export default function CreditsPage() {
                 <h3 className="text-lg font-medium text-gray-300 mb-2">Your Current Balance</h3>
                 <div className="text-3xl font-bold text-yellow-400 mb-2">
                   {userCredits.loading ? (
-                    <div className="animate-pulse">Loading...</div>
+                    <div className="mx-auto w-40 h-6 rounded bg-white/10 animate-pulse" aria-hidden="true" />
                   ) : (
                     `${userCredits.credits.toLocaleString()} Credits`
                   )}
@@ -210,30 +208,58 @@ export default function CreditsPage() {
               />
             </motion.div>
 
-            {/* Features */}
+            {/* Features - Minimal Design */}
             <motion.div
-              className="grid md:grid-cols-3 gap-6 mb-12"
+              className="flex flex-col md:flex-row items-center justify-center gap-8 mb-12 max-w-4xl mx-auto"
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.6 }}
             >
-              <div className="bg-black/50 rounded-xl p-6 text-center border border-gray-700">
-                <div className="text-3xl mb-3">⚡</div>
-                <h3 className="font-bold mb-2">Instant Delivery</h3>
-                <p className="text-gray-400 text-sm">Credits are added to your account immediately after payment confirmation</p>
-              </div>
+              <motion.div 
+                className="flex items-center gap-3 group"
+                whileHover={{ scale: 1.05 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30 flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-red-500/30 transition-all duration-300">
+                  <span className="text-orange-400 text-lg">⚡</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white text-sm">Instant Delivery</h3>
+                  <p className="text-gray-400 text-xs">Credits added immediately</p>
+                </div>
+              </motion.div>
               
-              <div className="bg-black/50 rounded-xl p-6 text-center border border-gray-700">
-                <div className="text-3xl mb-3">🔒</div>
-                <h3 className="font-bold mb-2">Secure Payments</h3>
-                <p className="text-gray-400 text-sm">All transactions are processed securely on the Cardano blockchain</p>
-              </div>
+              <div className="hidden md:block w-px h-8 bg-gradient-to-b from-transparent via-orange-500/30 to-transparent"></div>
               
-              <div className="bg-black/50 rounded-xl p-6 text-center border border-gray-700">
-                <div className="text-3xl mb-3">💎</div>
-                <h3 className="font-bold mb-2">Best Value</h3>
-                <p className="text-gray-400 text-sm">Larger packs offer better value with automatic discounts applied</p>
-              </div>
+              <motion.div 
+                className="flex items-center gap-3 group"
+                whileHover={{ scale: 1.05 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30 flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-red-500/30 transition-all duration-300">
+                  <span className="text-orange-400 text-lg">🔒</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white text-sm">Secure Payments</h3>
+                  <p className="text-gray-400 text-xs">Cardano blockchain</p>
+                </div>
+              </motion.div>
+              
+              <div className="hidden md:block w-px h-8 bg-gradient-to-b from-transparent via-orange-500/30 to-transparent"></div>
+              
+              <motion.div 
+                className="flex items-center gap-3 group"
+                whileHover={{ scale: 1.05 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-orange-500/20 to-red-500/20 border border-orange-500/30 flex items-center justify-center group-hover:from-orange-500/30 group-hover:to-red-500/30 transition-all duration-300">
+                  <span className="text-orange-400 text-lg">💎</span>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-white text-sm">Best Value</h3>
+                  <p className="text-gray-400 text-xs">Bulk discounts available</p>
+                </div>
+              </motion.div>
             </motion.div>
           </>
         )}

@@ -5,10 +5,13 @@ import { motion } from 'framer-motion'
 import SymbolRenderer from './SymbolRenderer'
 // Removed hardcoded symbols - using database data instead
 import { casinoSoundManager } from '../lib/casinoSoundManager'
+import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 
 interface SpinningReelCarouselProps {
   isSpinning: boolean
   winningItem: any | null
+  fillerPool?: Array<{ key: string; name: string; emoji?: string; imageUrl?: string | null; rarity: string }>
+  seed?: string
   onComplete: () => void
   spinDuration?: number
   stopDuration?: number
@@ -17,6 +20,8 @@ interface SpinningReelCarouselProps {
 export function SpinningReelCarousel({ 
   isSpinning, 
   winningItem, 
+  fillerPool = [],
+  seed,
   onComplete,
   spinDuration = 3000,
   stopDuration = 2000
@@ -27,41 +32,41 @@ export function SpinningReelCarousel({
   const hasCompletedRef = useRef(false)
   const itemWidth = 120
   const visibleItems = 7
+  const { canUseComplexEffects } = useDeviceCapabilities()
   
   // Create comprehensive reel with all symbols
   const reelItems = useRef<any[]>([])
   
   // Generate reel items with all symbols repeated for smooth scrolling
+  // Simple seeded RNG (xorshift32-like)
+  const seededRandom = useCallback((i: number) => {
+    const base = (seed || `${reelItems.current.length}-${Date.now()}`).split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0) + i * 2654435761
+    let x = base >>> 0
+    x ^= x << 13
+    x ^= x >>> 17
+    x ^= x << 5
+    return (x >>> 0) / 0xffffffff
+  }, [seed])
+
   const generateReelItems = useCallback(() => {
     console.log('🎰 Generating reel items...')
     
     try {
-      // Use fallback symbols for carousel animation (visual only)
-      const fallbackSymbols = [
-        { 
-          key: 'dogecoin', 
-          name: 'Dogecoin King', 
-          emoji: '🐕', 
-          rarity: 'legendary',
-          imageUrl: null // Will be updated when we fetch real data
-        },
-        { 
-          key: 'hosky', 
-          name: 'hosky', 
-          emoji: '🦔', 
-          rarity: 'legendary',
-          imageUrl: 'https://pbs.twimg.com/profile_images/1671953158754107394/fqGb2y7__400x400.jpg'
-        }
+      // Build symbol pool from fillerPool or minimal fallback
+      const pool = (fillerPool && fillerPool.length > 0) ? fillerPool : [
+        { key: 'coin', name: 'Coin', emoji: '🪙', rarity: 'common', imageUrl: null },
+        { key: 'diamond', name: 'Diamond', emoji: '💎', rarity: 'rare', imageUrl: null },
+        { key: 'crown', name: 'Crown', emoji: '👑', rarity: 'rare', imageUrl: null },
       ]
-      console.log('🎰 Using fallback symbols for carousel animation')
+      console.log('🎰 Using pool size:', pool.length)
       
       // Reduce reel length to prevent disappearing symbols
-      const reelLength = Math.min(20, Math.max(15, fallbackSymbols.length * 2)) // Smaller reel for stability
+      const reelLength = Math.min(24, Math.max(16, pool.length * 3))
       const items = []
       
       for (let i = 0; i < reelLength; i++) {
-        const symbolIndex = i % fallbackSymbols.length
-        const symbol = fallbackSymbols[symbolIndex]
+        const symbolIndex = Math.floor(seededRandom(i) * pool.length)
+        const symbol = pool[symbolIndex]
         
         if (!symbol) {
           console.warn('⚠️ Missing symbol at index:', symbolIndex)
@@ -85,13 +90,22 @@ export function SpinningReelCarousel({
       
       // Insert winning item at strategic position for better reveal timing
       if (winningItem && items.length > 0) {
-        const winningPosition = Math.floor(items.length * 0.6) // 60% for better timing
-        items[winningPosition] = {
+        // Insert a near-miss just before the win
+        const nearMissPos = Math.floor(items.length * 0.55)
+        const winPos = Math.floor(items.length * 0.6)
+        const nearMiss = pool.find(p => p.key !== winningItem.symbol?.key) || pool[0]
+        items[nearMissPos] = {
+          id: `nearmiss-${nearMiss.key}`,
+          symbol: { key: nearMiss.key, name: nearMiss.name, emoji: nearMiss.emoji, imageUrl: nearMiss.imageUrl },
+          rarity: nearMiss.rarity,
+          isWinning: false
+        }
+        items[winPos] = {
           ...winningItem,
-          id: `winning-${winningItem.symbol?.key || 'item'}`, // Unique ID for winning item
+          id: `winning-${winningItem.symbol?.key || 'item'}`,
           isWinning: true
         }
-        console.log('🎯 Added winning item at position:', winningPosition, 'out of', items.length)
+        console.log('🎯 Added near-miss at', nearMissPos, 'and winning at', winPos)
       }
       
       return items
@@ -242,8 +256,8 @@ export function SpinningReelCarousel({
     <div className="relative w-full h-56 overflow-hidden bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-2xl border-4 border-yellow-400/60 shadow-2xl">
       
       {/* Center line indicator - more prominent */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-2 h-full bg-gradient-to-b from-red-500 via-yellow-400 to-red-500 z-20 shadow-lg shadow-yellow-400/50" />
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-1 h-full bg-white z-30 shadow-lg" />
+      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3 h-full bg-gradient-to-b from-yellow-400 via-white to-yellow-400 z-30 shadow-[0_0_30px_rgba(255,255,200,0.8)] blur-[1px] rounded-full" />
+      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[2px] h-full bg-white/90 z-40" />
       
       {/* Debug info */}
       <div className="absolute top-2 left-2 z-50 text-white text-xs bg-black/50 p-2 rounded">
@@ -323,6 +337,7 @@ export function SpinningReelCarousel({
                 width: itemWidth - 8, 
                 height: 180
               }}
+              whileHover={{ rotateX: 6, rotateY: 6, scale: 1.03 }}
               animate={
                 isInCelebration ? {
                   scale: [1, 1.1, 1],
@@ -331,6 +346,8 @@ export function SpinningReelCarousel({
                 } : isInRevealHold ? {
                   scale: [1, 1.05, 1.05],
                   boxShadow: ['0 0 20px rgba(255,255,0,0.5)', '0 0 40px rgba(255,255,0,0.8)', '0 0 20px rgba(255,255,0,0.5)']
+                } : (animationState === 'resolution' && isWinningItem) ? {
+                  scale: [1, 0.92, 1]
                 } : {}
               }
               transition={
@@ -342,6 +359,9 @@ export function SpinningReelCarousel({
                   duration: 0.8,
                   repeat: Infinity,
                   ease: "easeInOut"
+                } : (animationState === 'resolution' && isWinningItem) ? {
+                  duration: 0.12,
+                  ease: 'easeOut'
                 } : {}
               }
             >
@@ -373,14 +393,19 @@ export function SpinningReelCarousel({
                     } : {}
                   }
                 >
-                  {item.symbol.imageUrl ? (
-                    <img 
-                      src={item.symbol.imageUrl} 
-                      alt={item.symbol.name}
-                      className="symbol-image rounded-lg"
-                    />
-                  ) : (
-                    <div className="text-4xl">{item.symbol.emoji}</div>
+                  <SymbolRenderer
+                    symbol={{
+                      id: (item.symbol as any).key || item.id,
+                      name: item.symbol.name,
+                      emoji: item.symbol.emoji,
+                      imageUrl: item.symbol.imageUrl || null,
+                      rarity: item.rarity
+                    }}
+                    size={64}
+                  />
+                  {/* Glass reflection overlay */}
+                  {canUseComplexEffects && (
+                    <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-b from-white/10 via-transparent to-transparent mix-blend-screen" />
                   )}
                 </motion.div>
                 

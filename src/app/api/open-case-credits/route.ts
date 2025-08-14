@@ -126,6 +126,7 @@ async function caseOpeningHandler(request: NextRequest) {
           rarity,
           value,
           is_active,
+          withdrawable,
           metadata
         )
       `)
@@ -143,7 +144,8 @@ async function caseOpeningHandler(request: NextRequest) {
     }
 
     console.log('✅ Case symbols found:', caseSymbols.length, 'symbols configured')
-    console.log('🎰 Available symbols:', caseSymbols.map(cs => ({ name: cs.symbols.name, weight: cs.weight })))
+    const getRelSymbol = (cs: any) => Array.isArray(cs.symbols) ? cs.symbols[0] : cs.symbols
+    console.log('🎰 Available symbols:', caseSymbols.map(cs => { const sym = getRelSymbol(cs); return ({ name: sym.name, weight: cs.weight }) }))
 
     // Check recent openings for pity timer
     const { data: recentOpenings, error: openingsError } = await supabaseAdmin
@@ -166,8 +168,8 @@ async function caseOpeningHandler(request: NextRequest) {
     // Activate pity timer after 15 consecutive losses (using case symbols)
     if (lossStreak >= 15) {
       const rareSymbols = caseSymbols
-        .filter(cs => ['epic', 'legendary'].includes(cs.symbols.rarity))
-        .map(cs => cs.symbols);
+        .filter(cs => ['epic', 'legendary'].includes(getRelSymbol(cs).rarity))
+        .map(cs => getRelSymbol(cs));
       
       if (rareSymbols.length > 0) {
         const pityIndex = Math.floor(randomValue * rareSymbols.length);
@@ -191,10 +193,11 @@ async function caseOpeningHandler(request: NextRequest) {
       for (const caseSymbol of caseSymbols) {
         cumulative += caseSymbol.weight;
         if (randomChoice <= cumulative) {
+          const sym = getRelSymbol(caseSymbol)
           selectedSymbol = {
-            ...caseSymbol.symbols,
-            key: caseSymbol.symbols.metadata?.key || caseSymbol.symbols.name.toLowerCase().replace(/\s+/g, '_'),
-            multiplier: caseSymbol.symbols.value / caseData.price // Calculate multiplier from value
+            ...sym,
+            key: sym.metadata?.key || sym.name.toLowerCase().replace(/\s+/g, '_'),
+            multiplier: sym.value / caseData.price // Calculate multiplier from value
           };
           break;
         }
@@ -202,7 +205,7 @@ async function caseOpeningHandler(request: NextRequest) {
       
       // Fallback to first symbol if something went wrong
       if (!selectedSymbol) {
-        const firstSymbol = caseSymbols[0].symbols;
+        const firstSymbol = getRelSymbol(caseSymbols[0]);
         selectedSymbol = {
           ...firstSymbol,
           key: firstSymbol.metadata?.key || firstSymbol.name.toLowerCase().replace(/\s+/g, '_'),
@@ -225,13 +228,13 @@ async function caseOpeningHandler(request: NextRequest) {
     const netResult = winnings - caseData.price;
     const isProfit = netResult > 0;
 
-    // SIMPLIFIED LOGIC: Always credit the winnings
+    // Decide crediting vs inventory-only (NFT) based on symbol withdrawable/high value
+    const isWithdrawable = (selectedSymbol as any).withdrawable === true;
     const isBigReward = selectedSymbol.multiplier >= 5.0;
-    let inventoryItem = null;
-    let credited = true;
-    
-    // Always add winnings to credits
-    let newCredits = user.credits - caseData.price + winnings;
+    let credited = !isWithdrawable; // do not auto-credit withdrawable items
+    let newCredits = credited
+      ? user.credits - caseData.price + winnings
+      : user.credits - caseData.price; // pay case cost only; value awaits NFT mint
 
     // Restore stats calculations
     const newTotalSpent = user.total_spent + caseData.price;
@@ -282,7 +285,7 @@ async function caseOpeningHandler(request: NextRequest) {
         is_pity_activated: isPityActivated,
         user_balance_before: user.credits,
         user_balance_after: newCredits,
-        is_withdrawn: credited ? true : false, // Mark as withdrawn if instantly credited
+        is_withdrawn: credited ? true : false, // only mark withdrawn for credited path
         withdrawal_type: credited ? 'credits' : null,
         withdrawal_tx_hash: credited ? 'instant_credit' : null,
         withdrawal_timestamp: credited ? new Date().toISOString() : null,

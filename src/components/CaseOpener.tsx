@@ -363,6 +363,10 @@ export function CaseOpener({
                     </div>
                   </div>
                 )}
+                
+                {/* Streak info */}
+                {result.streakInfo && (
+                  <div className="mt-3 text-center">
                     <div className="text-sm font-bold text-blue-300">
                       {result.streakInfo.streakType === 'win' ? '🔥' : '💪'} 
                       {result.streakInfo.streakCount} {result.streakInfo.streakType} streak!

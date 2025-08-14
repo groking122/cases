@@ -5,7 +5,7 @@
 
 import { NextRequest } from 'next/server'
 import jwt from 'jsonwebtoken'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase'
 import type { AdminUser, AdminPermission } from '@/types/admin'
 
 const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-admin-secret-key'
@@ -55,6 +55,9 @@ export async function verifyAdminToken(
     const token = authHeader.replace('Bearer ', '')
 
     // Check if token is blacklisted
+    if (!supabase) {
+      return { success: false, error: 'Database configuration error' }
+    }
     const { data: blacklistedToken } = await supabase
       .from('admin_token_blacklist')
       .select('id')
@@ -211,6 +214,9 @@ export async function revokeAdminSession(token: string, adminId: string): Promis
   const decoded = jwt.decode(token) as any
   const expiresAt = new Date(decoded.exp * 1000).toISOString()
 
+  if (!supabase) {
+    throw new Error('Database configuration error')
+  }
   await supabase.from('admin_token_blacklist').insert({
     token_hash: tokenHash,
     admin_id: adminId,

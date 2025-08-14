@@ -118,17 +118,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform case_symbols into the format expected by the rest of the code
-    const symbols = caseSymbols.map(cs => ({
-      id: cs.symbols.id,
-      name: cs.symbols.name,
-      description: cs.symbols.description,
-      image_url: cs.symbols.image_url,
-      rarity: cs.symbols.rarity,
-      value: cs.symbols.value,
-      drop_rate: cs.weight / 100, // Convert weight to drop rate
-      is_active: cs.symbols.is_active,
-      metadata: cs.symbols.metadata
-    }))
+    const getRelSymbol = (cs: any) => Array.isArray(cs.symbols) ? cs.symbols[0] : cs.symbols
+    const symbols = caseSymbols.map(cs => {
+      const sym = getRelSymbol(cs)
+      return {
+        id: sym.id,
+        name: sym.name,
+        description: sym.description,
+        image_url: sym.image_url,
+        rarity: sym.rarity,
+        value: sym.value,
+        drop_rate: cs.weight / 100, // Convert weight to drop rate
+        is_active: sym.is_active,
+        metadata: sym.metadata
+      }
+    })
 
     // Generate provably fair result
     const serverSeed = crypto.randomBytes(32).toString('hex')
@@ -193,6 +197,7 @@ export async function POST(request: NextRequest) {
       .eq('id', user.id)
 
     // Return result with all the data needed for frontend
+    const selectedSkin = selectedSymbol
     return NextResponse.json({
       skin: selectedSkin,
       caseOpening: caseOpening,
