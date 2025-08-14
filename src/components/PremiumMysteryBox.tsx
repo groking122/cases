@@ -6,7 +6,7 @@ import { SYMBOL_CONFIG } from '@/lib/symbols';
 const REAL_REWARDS = Object.values(SYMBOL_CONFIG).map(s => ({
   key: s.key,
   name: s.name,
-  icon: s.emoji,
+  icon: s.icon,
   rarity: s.rarity,
   color: s.color,
   multiplier: s.multiplier,

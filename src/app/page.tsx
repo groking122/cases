@@ -13,6 +13,7 @@ import { useWallet } from '@meshsdk/react'
 import { useRouter } from 'next/navigation'
 import { useDeviceCapabilities } from "@/hooks/useDeviceCapabilities"
 import type { CaseOpening } from "@/types/database"
+import { SYMBOL_CONFIG } from "@/lib/symbols"
 import Link from 'next/link'
 
 
@@ -288,13 +289,13 @@ export default function Home() {
       name: result.name || 'Unknown',
       rarity: result.rarity,
       value: result.value,
-      image_url: SYMBOL_CONFIG[result.id as keyof typeof SYMBOL_CONFIG]?.emoji || '❓',
+      image_url: SYMBOL_CONFIG[result.id as keyof typeof SYMBOL_CONFIG]?.icon || '❓',
       description: `A ${result.rarity} symbol with great value`,
       collection: 'Mystery Collection'
     }
     
     setOpenedSkin(skin)
-    setShowEnhancedBox(false)
+    // setShowEnhancedBox(false) // Removed unused state
     setIsOpening(false)
     setShowPrizeModal(true)
     
@@ -308,7 +309,7 @@ export default function Home() {
   const handleBoxError = useCallback((error: string) => {
     console.error('❌ Professional box error:', error)
     toast.error(error)
-    setShowEnhancedBox(false)
+    // setShowEnhancedBox(false) // Removed unused state
     setIsOpening(false)
     
     // Revert optimistic credit update
@@ -392,7 +393,7 @@ export default function Home() {
     setIsOpening(false)
     
     // Professional cleanup
-    AnimationPool.forceGarbageCollection()
+    // AnimationPool.forceGarbageCollection() // Removed unused AnimationPool
     
     fetchUserCredits()
     setRefreshTrigger(prev => prev + 1)

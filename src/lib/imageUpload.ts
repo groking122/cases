@@ -154,7 +154,7 @@ export class ImageUploadService {
           width: options.width,
           height: options.height,
           quality: options.quality || 80,
-          format: options.format
+          format: options.format as any
         }
       })
 

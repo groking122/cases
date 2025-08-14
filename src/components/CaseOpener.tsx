@@ -175,8 +175,14 @@ export function CaseOpener({
   };
 
   const getRarityStyles = (rarity: string) => {
-    const config = RARITY_CONFIG[rarity as keyof typeof RARITY_CONFIG];
-    return config || RARITY_CONFIG.common;
+    const rarityStyles = {
+      common: { border: 'border-gray-400', gradient: 'from-gray-600 to-gray-800' },
+      rare: { border: 'border-blue-400', gradient: 'from-blue-600 to-blue-800' },
+      epic: { border: 'border-purple-400', gradient: 'from-purple-600 to-purple-800' },
+      legendary: { border: 'border-yellow-400', gradient: 'from-yellow-600 to-yellow-800' },
+      mythic: { border: 'border-pink-400', gradient: 'from-pink-600 to-pink-800' }
+    };
+    return rarityStyles[rarity as keyof typeof rarityStyles] || rarityStyles.common;
   };
 
   const formatCurrency = (amount: number) => {
@@ -331,9 +337,9 @@ export function CaseOpener({
                 </div>
                 
                 <div className="w-32 h-32 mx-auto mb-4 flex items-center justify-center">
-                  {result.symbol.image_url ? (
+                  {result.symbol.image ? (
                     <img 
-                      src={result.symbol.image_url} 
+                      src={result.symbol.image} 
                       alt={result.symbol.name}
                       className="w-full h-full object-contain rounded-lg"
                     />

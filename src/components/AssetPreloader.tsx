@@ -34,7 +34,7 @@ export function AssetPreloader({ onProgress, onComplete }: AssetPreloaderProps) 
       
       // Only add emoji (always available, no 404 errors)
       assetList.push({
-        src: symbol.emoji,
+        src: symbol.icon,
         type: 'emoji',
         priority,
         loaded: false

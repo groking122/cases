@@ -33,7 +33,7 @@ export async function mintSkinNFT(params: {
 
   const tx = await lucid
     .newTx()
-    .mintAssets({ [unit]: 1n }, nativeScript)
+    .mintAssets({ [unit]: BigInt(1) }, nativeScript as any)
     .attachMetadata(721, metadata)
     // Send the NFT with minimum ADA to satisfy UTxO requirements
     .payToAddress(params.toAddress, { lovelace: 2_000_000n, [unit]: 1n })

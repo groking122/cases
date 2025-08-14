@@ -26,7 +26,7 @@ export function AssetAdminPanel() {
     const symbolList = Object.values(SYMBOL_CONFIG).map(symbol => ({
       id: symbol.key,
       name: symbol.name,
-      emoji: symbol.emoji,
+      emoji: symbol.icon,
       rarity: symbol.rarity,
       hasCustomAsset: !!assetManager.getCustomAsset(symbol.key),
       customUrl: assetManager.getCustomAsset(symbol.key) || undefined

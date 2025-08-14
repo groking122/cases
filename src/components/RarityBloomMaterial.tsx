@@ -143,7 +143,7 @@ export const RarityBloomMaterial = ({
   intensity,
   bloomStrength = 1.0
 }: RarityBloomMaterialProps) => {
-  const materialRef = useRef<any>()
+  const materialRef = useRef<any>(null)
 
   // Get rarity-based settings
   const rarityColor = RARITY_COLORS[rarity] || RARITY_COLORS.common
@@ -237,7 +237,7 @@ interface ParticleBloomMaterialProps {
 export const ParticleBloomMaterial = ({ 
   pixelRatio = 1 
 }: ParticleBloomMaterialProps) => {
-  const materialRef = useRef<any>()
+  const materialRef = useRef<any>(null)
 
   useFrame((state, delta) => {
     if (materialRef.current) {

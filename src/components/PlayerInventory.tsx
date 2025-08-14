@@ -14,7 +14,7 @@ interface InventoryItem {
   reward_value: number
   created_at: string
   is_withdrawn: boolean
-  withdrawal_type?: 'credits'
+  withdrawal_type?: 'credits' | 'nft'
   withdrawal_tx_hash?: string
   eligible_for_nft?: boolean
 }

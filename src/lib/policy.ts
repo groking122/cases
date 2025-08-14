@@ -18,7 +18,7 @@ export async function getPolicy() {
       }
     : { type: "sig", keyHash: paymentCredential.hash };
 
-  const policyId = lucid.utils.mintingPolicyToId(nativeScript);
+  const policyId = lucid.utils.mintingPolicyToId(nativeScript as any);
   return { lucid, nativeScript, policyId };
 }
 

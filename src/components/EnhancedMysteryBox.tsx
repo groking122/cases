@@ -10,14 +10,14 @@ import { CasinoAnticipationSystem, useAnticipationSequence } from './CasinoAntic
 import { useDeviceCapabilities } from '@/hooks/useDeviceCapabilities'
 import { AnimationPool } from '@/lib/AnimationPool'
 import { WebGLPerformanceMonitor } from './WebGLPerformanceMonitor'
-import { CSGOCaseModel } from './CSGOCaseModel'
-import { CSGOItemCarousel } from './CSGOItemCarousel'
+// import { CSGOCaseModel } from './CSGOCaseModel' // Removed unused component
+// import { CSGOItemCarousel } from './CSGOItemCarousel' // Removed unused component
 import { SimpleCarousel } from './SimpleCarousel'
 import SymbolRenderer from './SymbolRenderer'
 import { SYMBOL_CONFIG, getSymbolByKey } from '@/lib/symbols'
 
 // Memoized components to prevent unnecessary re-renders
-const MemoizedCaseModel = memo(CSGOCaseModel)
+// const MemoizedCaseModel = memo(CSGOCaseModel) // Removed unused component
 const MemoizedAnticipationSystem = memo(CasinoAnticipationSystem)
 const MemoizedRarityEffects = memo(RarityEffectsSystem)
 
@@ -509,7 +509,10 @@ export const EnhancedMysteryBox = ({
                 exit={{ scale: 0.8, opacity: 0 }}
                 className="flex justify-center"
               >
-                <MemoizedCaseModel isOpening={true} />
+                {/* <MemoizedCaseModel isOpening={true} /> */}
+                <div className="w-64 h-64 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center text-white text-xl">
+                  Mystery Box
+                </div>
               </motion.div>
             )}
 
@@ -529,12 +532,11 @@ export const EnhancedMysteryBox = ({
                     onComplete={handleCarouselComplete}
                   />
                 ) : (
-                  <CSGOItemCarousel
+                  <SimpleCarousel
                     isSpinning={true}
                     items={carouselItems}
                     winningItem={carouselItems.find(item => item.isWinning) || null}
                     onComplete={handleCarouselComplete}
-                    speed={0.7}
                   />
                 )}
               </motion.div>

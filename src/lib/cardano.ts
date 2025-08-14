@@ -19,7 +19,7 @@ export async function getLucid(): Promise<Lucid> {
     : "https://cardano-preprod.blockfrost.io/api/v0";
 
   // Ensure Lucid uses the NodeJS serialization library
-  const lucid = await Lucid.new(new Blockfrost(baseUrl, apiKey), network, { csl: CSL as any });
+  const lucid = await Lucid.new(new Blockfrost(baseUrl, apiKey), network);
 
   const mnemonic = process.env.MINTING_MNEMONIC;
   if (!mnemonic) {
