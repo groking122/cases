@@ -1,0 +1,298 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
+
+export async function POST(request: NextRequest) {
+  try {
+    const { 
+      userId, 
+      caseOpeningId, 
+      withdrawalType, 
+      paymentMethod, 
+      paymentDetails,
+      walletAddress 
+    } = await request.json()
+
+    if (!userId || !caseOpeningId || !withdrawalType) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Get case opening data
+    if (!supabaseAdmin) {
+      return NextResponse.json({ error: 'Database connection not available' }, { status: 500 })
+    }
+
+    const { data: caseOpening, error: openingError } = await supabaseAdmin
+      .from('case_openings')
+      .select('*')
+      .eq('id', caseOpeningId)
+      .eq('user_id', userId)
+      .single()
+
+    if (openingError || !caseOpening) {
+      return NextResponse.json({ error: 'Case opening not found' }, { status: 404 })
+    }
+
+    if (caseOpening.is_withdrawn || caseOpening.withdrawal_requested) {
+      return NextResponse.json({ error: 'Already withdrawn or withdrawal already requested' }, { status: 400 })
+    }
+
+    // Get user data with credit history
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select(`
+        *,
+        total_credits_purchased,
+        total_credits_withdrawn
+      `)
+      .eq('id', userId)
+      .single()
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Get user's lifetime credit purchase and withdrawal totals
+    const { data: purchaseTotal } = await supabaseAdmin
+      .from('credit_transactions')
+      .select('credits_purchased')
+      .eq('user_id', userId)
+      .eq('transaction_type', 'purchase')
+
+    const { data: withdrawalTotal } = await supabaseAdmin
+      .from('withdrawal_requests')
+      .select('credits_requested')
+      .eq('user_id', userId)
+      .eq('status', 'completed')
+
+    const lifetimePurchased = purchaseTotal?.reduce((sum, t) => sum + (t.credits_purchased || 0), 0) || 0
+    const lifetimeWithdrawn = withdrawalTotal?.reduce((sum, w) => sum + (w.credits_requested || 0), 0) || 0
+    const creditsRequested = caseOpening.reward_value
+
+    // Check if user has enough credits to deduct
+    if (user.credits < creditsRequested) {
+      return NextResponse.json({ 
+        error: `Insufficient credits. You have ${user.credits} credits but need ${creditsRequested} credits to withdraw this item.` 
+      }, { status: 400 })
+    }
+
+    // ⚡ FRAUD DETECTION: Calculate risk score
+    const { data: riskData } = await supabaseAdmin
+      .rpc('calculate_risk_score', {
+        p_user_id: userId,
+        p_credits_requested: creditsRequested,
+        p_user_lifetime_purchased: lifetimePurchased,
+        p_user_lifetime_withdrawn: lifetimeWithdrawn
+      })
+
+    const riskScore = riskData?.[0]?.risk_score || 0
+    const riskReasons = riskData?.[0]?.risk_reasons || []
+    const isSuspicious = riskData?.[0]?.is_suspicious || false
+
+    // 🔐 SECURITY: Auto-reject highly suspicious requests
+    if (riskScore >= 100) {
+      return NextResponse.json({ 
+        error: 'Withdrawal request blocked for security review. Please contact support.',
+        riskReasons 
+      }, { status: 403 })
+    }
+
+    // 💰 DEDUCT CREDITS IMMEDIATELY when request is made
+    const newCreditBalance = user.credits - creditsRequested
+    
+    const { error: creditDeductError } = await supabaseAdmin
+      .from('users')
+      .update({ 
+        credits: newCreditBalance,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId)
+
+    if (creditDeductError) {
+      console.error('Error deducting credits:', creditDeductError)
+      return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
+    }
+
+    // Create withdrawal request record with fraud detection data
+    const { data: withdrawalRequest, error: insertError } = await supabaseAdmin
+      .from('withdrawal_requests')
+      .insert({
+        user_id: userId,
+        case_opening_id: caseOpeningId,
+        withdrawal_type: withdrawalType,
+        payment_method: paymentMethod || 'manual',
+        payment_details: paymentDetails || '',
+        wallet_address: walletAddress || user?.wallet_address,
+        credits_requested: creditsRequested,
+        symbol_key: caseOpening.symbol_key,
+        symbol_name: caseOpening.symbol_name,
+        symbol_rarity: caseOpening.symbol_rarity,
+        user_lifetime_purchased_credits: lifetimePurchased,
+        user_lifetime_withdrawn_credits: lifetimeWithdrawn,
+        risk_score: riskScore,
+        risk_reasons: riskReasons,
+        is_suspicious: isSuspicious,
+        status: isSuspicious ? 'flagged' : 'pending',
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error('Error creating withdrawal request:', insertError)
+      
+      // Rollback credit deduction on error
+      await supabaseAdmin
+        .from('users')
+        .update({ credits: user.credits })
+        .eq('id', userId)
+        
+      return NextResponse.json({ error: 'Failed to create withdrawal request' }, { status: 500 })
+    }
+
+    // 📊 Record credit flow for audit trail
+    await supabaseAdmin
+      .from('credit_flow_tracking')
+      .insert({
+        user_id: userId,
+        transaction_type: 'withdrawal_request',
+        credits_change: -creditsRequested,
+        credits_before: user.credits,
+        credits_after: newCreditBalance,
+        withdrawal_request_id: withdrawalRequest.id,
+        case_opening_id: caseOpeningId,
+        description: `Withdrawal requested for ${caseOpening.symbol_name} (${caseOpening.symbol_rarity})`,
+        metadata: {
+          payment_method: paymentMethod,
+          risk_score: riskScore,
+          is_suspicious: isSuspicious
+        }
+      })
+
+    // Mark case opening as withdrawal requested
+    await supabaseAdmin
+      .from('case_openings')
+      .update({
+        withdrawal_requested: true,
+        withdrawal_request_id: withdrawalRequest.id,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', caseOpeningId)
+
+    // Send email notification (you can implement this with your preferred email service)
+    await sendWithdrawalNotification({
+      requestId: withdrawalRequest.id,
+      userWallet: walletAddress || user?.wallet_address,
+      withdrawalType,
+      amount: caseOpening.credits_won,
+      symbolName: caseOpening.symbol_name,
+      symbolRarity: caseOpening.symbol_rarity,
+      paymentMethod,
+      paymentDetails
+    })
+
+    // Enhanced email notification with security details
+    await sendWithdrawalNotification({
+      requestId: withdrawalRequest.id,
+      userWallet: walletAddress || user?.wallet_address,
+      withdrawalType,
+      creditsRequested,
+      creditsValueUSD: (creditsRequested * 0.01).toFixed(2),
+      symbolName: caseOpening.symbol_name,
+      symbolRarity: caseOpening.symbol_rarity,
+      paymentMethod,
+      paymentDetails,
+      riskScore,
+      riskReasons,
+      isSuspicious,
+      lifetimePurchased,
+      lifetimeWithdrawn,
+      userCreditsAfter: newCreditBalance
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: isSuspicious 
+        ? 'Withdrawal request submitted and flagged for security review. You will be contacted within 24-48 hours.'
+        : 'Withdrawal request submitted successfully! Credits have been deducted and you will receive confirmation shortly.',
+      requestId: withdrawalRequest.id,
+      creditsDeducted: creditsRequested,
+      newCreditBalance: newCreditBalance,
+      status: withdrawalRequest.status,
+      estimatedProcessingTime: isSuspicious ? '24-72 hours (security review)' : '24-48 hours',
+      securityInfo: {
+        riskScore,
+        isSuspicious,
+        ...(riskReasons.length > 0 && { riskReasons })
+      }
+    })
+
+  } catch (error) {
+    console.error('Withdrawal request error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Enhanced email notification function with security details
+async function sendWithdrawalNotification(details: any) {
+  const alertLevel = details.isSuspicious ? '🚨 SUSPICIOUS' : 
+                     details.riskScore >= 50 ? '⚠️ HIGH RISK' :
+                     details.riskScore >= 25 ? '⚡ MEDIUM RISK' : '✅ LOW RISK'
+  
+  console.log('📧 ENHANCED WITHDRAWAL NOTIFICATION:')
+  console.log('=' .repeat(50))
+  console.log(`🆔 Request ID: ${details.requestId}`)
+  console.log(`👤 User: ${details.userWallet?.slice(0, 20)}...`)
+  console.log(`💰 Amount: ${details.creditsRequested} credits ($${details.creditsValueUSD})`)
+  console.log(`🎯 Item: ${details.symbolName} (${details.symbolRarity})`)
+  console.log(`💳 Payment: ${details.paymentMethod}`)
+  console.log(`📝 Details: ${details.paymentDetails}`)
+  console.log('')
+  console.log('🔐 SECURITY ANALYSIS:')
+  console.log(`${alertLevel} - Risk Score: ${details.riskScore}/100`)
+  console.log(`📊 Lifetime Purchased: ${details.lifetimePurchased} credits`)
+  console.log(`📤 Lifetime Withdrawn: ${details.lifetimeWithdrawn} credits`)
+  console.log(`💳 User Credits After: ${details.userCreditsAfter} credits`)
+  if (details.riskReasons?.length > 0) {
+    console.log('⚠️ Risk Factors:')
+    details.riskReasons.forEach((reason: string) => console.log(`   • ${reason}`))
+  }
+  console.log('=' .repeat(50))
+  
+  // Send actual email here
+  // Example with fetch to email service:
+  /*
+  try {
+    await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        personalizations: [{
+          to: [{ email: process.env.ADMIN_EMAIL }],
+          subject: `🎰 New Withdrawal Request #${details.requestId}`
+        }],
+        from: { email: process.env.FROM_EMAIL },
+        content: [{
+          type: 'text/html',
+          value: `
+            <h2>New Withdrawal Request</h2>
+            <p><strong>Request ID:</strong> ${details.requestId}</p>
+            <p><strong>User:</strong> ${details.userWallet}</p>
+            <p><strong>Type:</strong> ${details.withdrawalType}</p>
+            <p><strong>Amount:</strong> ${details.amount} credits</p>
+            <p><strong>Item:</strong> ${details.symbolName} (${details.symbolRarity})</p>
+            <p><strong>Payment Method:</strong> ${details.paymentMethod}</p>
+            <p><strong>Payment Details:</strong> ${details.paymentDetails}</p>
+            
+            <p>Please process this withdrawal within 24-48 hours.</p>
+          `
+        }]
+      })
+    })
+  } catch (error) {
+    console.error('Email sending failed:', error)
+  }
+  */
+}

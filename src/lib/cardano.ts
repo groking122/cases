@@ -21,11 +21,17 @@ export async function getLucid(): Promise<Lucid> {
   // Ensure Lucid uses the NodeJS serialization library
   const lucid = await Lucid.new(new Blockfrost(baseUrl, apiKey), network);
 
+  // Try mnemonic first, fallback to signing key
   const mnemonic = process.env.MINTING_MNEMONIC;
-  if (!mnemonic) {
-    throw new Error("MINTING_MNEMONIC is not set. Add it to your environment.");
+  const signingKey = process.env.MINTING_SIGNING_KEY;
+  
+  if (mnemonic) {
+    await lucid.selectWalletFromSeed(mnemonic);
+  } else if (signingKey) {
+    await lucid.selectWalletFromPrivateKey(signingKey);
+  } else {
+    throw new Error("Either MINTING_MNEMONIC or MINTING_SIGNING_KEY must be set in your environment.");
   }
-  await lucid.selectWalletFromSeed(mnemonic);
 
   lucidInstance = lucid;
   return lucidInstance;

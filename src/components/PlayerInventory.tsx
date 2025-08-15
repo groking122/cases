@@ -17,6 +17,7 @@ interface InventoryItem {
   withdrawal_type?: 'credits' | 'nft'
   withdrawal_tx_hash?: string
   eligible_for_nft?: boolean
+  withdrawal_requested?: boolean
 }
 
 interface PlayerInventoryProps {
@@ -35,6 +36,8 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
   const [selling, setSelling] = useState<string | null>(null)
   const [minting, setMinting] = useState<string | null>(null)
   const [justSold, setJustSold] = useState<string | null>(null)
+  const [showWithdrawalForm, setShowWithdrawalForm] = useState<InventoryItem | null>(null)
+  const [withdrawalSubmitting, setWithdrawalSubmitting] = useState(false)
 
   // Fetch player inventory
   const fetchInventory = async () => {
@@ -81,62 +84,56 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
     }
   }
 
-  // Mint as NFT (idempotent, server validates eligibility and ownership)
-  const handleMintAsNFT = async (item: InventoryItem) => {
-    if (minting || item.is_withdrawn) return
-    setMinting(item.id)
+  // Request manual withdrawal
+  const handleWithdrawalRequest = async (item: InventoryItem, paymentMethod: string, paymentDetails: string) => {
+    if (withdrawalSubmitting || item.is_withdrawn) return
+    setWithdrawalSubmitting(true)
 
     try {
       const userId = await resolveUserId()
       if (!userId) {
         alert('Unable to verify user. Please reconnect your wallet and try again.')
-        setMinting(null)
+        setWithdrawalSubmitting(false)
         return
       }
 
-      const idempotencyKey = (globalThis.crypto as any)?.randomUUID?.() || `${item.id}-${Date.now()}`
-      const res = await fetch('/api/withdraw-nft', {
+      const response = await fetch('/api/request-withdrawal', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey
-        },
-        body: JSON.stringify({ caseOpeningId: item.id, userId })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          caseOpeningId: item.id,
+          withdrawalType: 'cash',
+          paymentMethod,
+          paymentDetails,
+          walletAddress: wallet ? (await wallet.getUsedAddresses())[0] : undefined
+        })
       })
 
-      let data: any = null
-      const ct = res.headers.get('content-type') || ''
-      if (ct.includes('application/json')) {
-        data = await res.json()
-      } else {
-        const raw = await res.text()
-        console.error('Non-JSON response from /api/withdraw-nft:', raw)
-        alert('Mint failed. Server returned an unexpected response.')
-        setMinting(null)
+      const data = await response.json()
+
+      if (!response.ok) {
+        alert(data.error || 'Failed to submit withdrawal request')
+        setWithdrawalSubmitting(false)
         return
       }
 
-      if (!res.ok || !data?.success) {
-        const msg = data?.error || 'Mint failed. Item may be ineligible.'
-        alert(msg)
-        setMinting(null)
-        return
-      }
-
-      // Optimistically mark withdrawn with NFT
+      // Mark as withdrawal requested (not withdrawn yet)
       setInventory(prev => prev.map(invItem =>
         invItem.id === item.id
-          ? { ...invItem, is_withdrawn: true, withdrawal_type: 'nft', withdrawal_tx_hash: data.txHash }
+          ? { ...invItem, withdrawal_requested: true }
           : invItem
       ))
 
+      setShowWithdrawalForm(null)
       setSelectedItem(null)
-      alert(`NFT minted! Tx: ${data.txHash}`)
-    } catch (e: any) {
-      console.error('Mint NFT error', e)
-      alert('Mint failed. Please try again later.')
+      alert(`✅ Withdrawal request submitted! Request ID: ${data.requestId}\n\nYou'll receive email confirmation shortly. Processing time: ${data.estimatedProcessingTime}`)
+      
+    } catch (error) {
+      console.error('Withdrawal request error:', error)
+      alert('Failed to submit withdrawal request. Please try again later.')
     } finally {
-      setMinting(null)
+      setWithdrawalSubmitting(false)
     }
   }
 
@@ -525,23 +522,17 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                            selectedItem.is_withdrawn ? '✅ Already Sold' :
                            `💰 Sell for ${selectedItem.reward_value} Credits`}
                         </Button>
-                        {selectedItem.eligible_for_nft && (
                         <Button
-                          onClick={() => {
-                            if (!minting && !selectedItem.is_withdrawn) {
-                              handleMintAsNFT(selectedItem)
-                            }
-                          }}
-                          className="w-full bg-purple-600 hover:bg-purple-700"
-                          disabled={!!minting || selectedItem.is_withdrawn}
+                          onClick={() => setShowWithdrawalForm(selectedItem)}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          disabled={selectedItem.is_withdrawn}
                         >
-                          {minting === selectedItem.id ? '⚙️ Minting...' : '🖼️ Mint as NFT'}
+                          💸 Request Cash Withdrawal
                         </Button>
-                        )}
                         <p className="text-xs text-gray-500 text-center">
                           {selectedItem.is_withdrawn
                             ? 'This item has already been withdrawn.'
-                            : 'Sell for credits instantly, or mint as an NFT to your wallet (eligible items only).'}
+                            : 'Sell for credits instantly, or request cash withdrawal (manual processing 24-48h).'}
                         </p>
                       </div>
                     )}
@@ -556,6 +547,114 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                   </>
                 )
               })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Withdrawal Request Form */}
+      <AnimatePresence>
+        {showWithdrawalForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-70 flex items-center justify-center p-4"
+            onClick={() => setShowWithdrawalForm(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-gray-800 border border-gray-600 rounded-xl p-6 max-w-md w-full"
+            >
+              <h3 className="text-xl font-bold text-white mb-4">💸 Request Cash Withdrawal</h3>
+              
+              <div className="mb-4 p-4 bg-gray-700 rounded-lg">
+                <div className="text-center">
+                  <div className="text-3xl mb-2">{getSymbolByKey(showWithdrawalForm.symbol_key)?.icon || '❓'}</div>
+                  <div className="font-semibold text-white">{showWithdrawalForm.symbol_name}</div>
+                  <div className="text-yellow-400 font-bold">{showWithdrawalForm.reward_value} credits</div>
+                </div>
+              </div>
+
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                const formData = new FormData(e.target as HTMLFormElement)
+                const paymentMethod = formData.get('paymentMethod') as string
+                const paymentDetails = formData.get('paymentDetails') as string
+                
+                if (!paymentMethod || !paymentDetails) {
+                  alert('Please fill in all fields')
+                  return
+                }
+                
+                handleWithdrawalRequest(showWithdrawalForm, paymentMethod, paymentDetails)
+              }}>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Payment Method
+                    </label>
+                    <select 
+                      name="paymentMethod"
+                      className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white"
+                      required
+                    >
+                      <option value="">Select payment method</option>
+                      <option value="paypal">PayPal</option>
+                      <option value="bank">Bank Transfer</option>
+                      <option value="crypto">Cryptocurrency</option>
+                      <option value="venmo">Venmo</option>
+                      <option value="cashapp">Cash App</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Payment Details
+                    </label>
+                    <textarea
+                      name="paymentDetails"
+                      placeholder="Enter your PayPal email, bank account details, crypto address, etc."
+                      className="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white h-20 resize-none"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="bg-blue-900/30 border border-blue-600/30 rounded-lg p-3">
+                    <div className="text-sm text-blue-300">
+                      <strong>📋 Processing Info:</strong>
+                      <ul className="mt-2 space-y-1 list-disc list-inside text-xs">
+                        <li>Manual review within 24-48 hours</li>
+                        <li>You'll receive email confirmation</li>
+                        <li>Minimum processing fee may apply</li>
+                        <li>Funds sent within 1-3 business days</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <Button
+                    type="button"
+                    onClick={() => setShowWithdrawalForm(null)}
+                    variant="outline"
+                    className="flex-1 border-gray-600"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    disabled={withdrawalSubmitting}
+                  >
+                    {withdrawalSubmitting ? '⚙️ Submitting...' : '📤 Submit Request'}
+                  </Button>
+                </div>
+              </form>
             </motion.div>
           </motion.div>
         )}
