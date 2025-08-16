@@ -21,8 +21,9 @@ export default function CreditsPage() {
   const { connected, wallet, connect, connecting } = useWallet()
   const router = useRouter()
   const [userCredits, setUserCredits] = useState<UserCredits>({ credits: 0, loading: false })
+  const [adaBalance, setAdaBalance] = useState<number>(0)
 
-  // Fetch user credits
+  // Fetch user credits and ADA balance
   const fetchUserCredits = async () => {
     if (!connected || !wallet) return
 
@@ -32,6 +33,7 @@ export default function CreditsPage() {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
       
+      // Fetch credits
       const response = await fetch('/api/get-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -42,8 +44,26 @@ export default function CreditsPage() {
         const data = await response.json()
         const newCredits = data.credits || 0
         setUserCredits({ credits: newCredits, loading: false })
-        return newCredits
       }
+
+      // Fetch ADA balance directly
+      try {
+        console.log('💰 Fetching ADA balance in credits page...')
+        const balanceValue = await wallet.getBalance()
+        console.log('💰 Credits page balance response:', balanceValue)
+        
+        if (Array.isArray(balanceValue)) {
+          const adaAsset = balanceValue.find(asset => asset.unit === 'lovelace')
+          if (adaAsset) {
+            const newAdaBalance = parseInt(adaAsset.quantity) / 1000000
+            setAdaBalance(newAdaBalance)
+            console.log('💰 ADA balance set in credits page:', newAdaBalance)
+          }
+        }
+      } catch (adaError) {
+        console.error('❌ Failed to fetch ADA balance in credits page:', adaError)
+      }
+      
     } catch (error) {
       console.error('Failed to fetch credits:', error)
       toast.error('Failed to fetch credits')
@@ -124,7 +144,9 @@ export default function CreditsPage() {
             
             <div className="min-w-[380px]">
               <WalletBalance 
+                connected={connected}
                 credits={userCredits.credits}
+                cardanoBalance={adaBalance}
                 onCreditsChange={handleCreditsUpdate}
               />
             </div>

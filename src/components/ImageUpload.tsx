@@ -75,18 +75,24 @@ export function ImageUpload({
       formData.append('isAdmin', isAdmin.toString())
 
       // Upload file
+      console.log('🔧 Uploading to API...')
       const response = await fetch('/api/upload-image', {
         method: 'POST',
         body: formData
       })
 
       const result = await response.json()
+      console.log('🔧 API response:', result)
 
       clearInterval(progressInterval)
       setProgress(100)
 
       if (!response.ok || !result.success) {
         throw new Error(result.error || 'Upload failed')
+      }
+
+      if (result.fallback) {
+        console.log('⚠️ Using fallback upload method')
       }
 
       // Clean up preview URL if it was a blob
@@ -174,9 +180,18 @@ export function ImageUpload({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-2 rounded-lg text-sm"
+          className="bg-red-500/20 border border-red-500 text-red-400 px-4 py-3 rounded-lg text-sm"
         >
-          {error}
+          <div className="flex items-start gap-2">
+            <span className="text-red-500 font-bold">⚠️</span>
+            <div>
+              <div className="font-medium">Upload Failed</div>
+              <div className="text-xs text-red-300 mt-1">{error}</div>
+              <div className="text-xs text-red-200 mt-2">
+                Try: Check file size (max {Math.round(maxSize / 1024 / 1024)}MB), format (JPEG, PNG, WebP, GIF), and network connection.
+              </div>
+            </div>
+          </div>
         </motion.div>
       )}
 

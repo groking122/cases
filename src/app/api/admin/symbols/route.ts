@@ -145,21 +145,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Create symbol
+    console.log('🔧 Creating symbol with data:', {
+      name,
+      description: description || '',
+      image_url: imageUrl,
+      rarity,
+      value: parseFloat(value),
+      is_active: isActive !== false,
+      authUser: authResult.user
+    })
+
+    const symbolData: any = {
+      name,
+      description: description || '',
+      image_url: imageUrl,
+      rarity,
+      value: parseFloat(value),
+      is_active: isActive !== false,
+      metadata: {
+        createdVia: 'admin_dashboard',
+        createdBy: authResult.user?.email || 'unknown'
+      }
+    }
+
+    // Only add created_by if we have a valid user ID (UUID format)
+    if (authResult.user?.userId && authResult.user.userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      symbolData.created_by = authResult.user.userId
+    }
+
     const { data: newSymbol, error } = await supabase
       .from('symbols')
-      .insert({
-        name,
-        description: description || '',
-        image_url: imageUrl,
-        rarity,
-        value: parseFloat(value),
-        is_active: isActive !== false,
-        created_by: authResult.user?.userId || 'unknown',
-        metadata: {
-          createdVia: 'admin_dashboard',
-          createdBy: authResult.user?.email || 'unknown'
-        }
-      })
+      .insert(symbolData)
       .select()
       .single()
 

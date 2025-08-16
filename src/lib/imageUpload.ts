@@ -23,16 +23,22 @@ export class ImageUploadService {
         return { success: false, error: validation.error }
       }
 
-      if (!supabaseAdmin) {
-        return { success: false, error: 'Admin client not configured' }
+      // Try to ensure bucket exists first
+      await this.ensureBucketExists()
+
+      const client = supabaseAdmin || supabase
+      if (!client) {
+        return { success: false, error: 'Supabase client not configured' }
       }
 
       // Generate unique filename
       const fileExt = file.name.split('.').pop()
       const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
 
+      console.log('🔧 Uploading image:', { fileName, fileSize: file.size, fileType: file.type })
+
       // Upload to Supabase Storage
-      const { data, error } = await supabaseAdmin.storage
+      const { data, error } = await client.storage
         .from(this.BUCKET_NAME)
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -40,14 +46,46 @@ export class ImageUploadService {
         })
 
       if (error) {
-        console.error('Upload error:', error)
+        console.error('❌ Upload error:', error)
+        
+        // If bucket doesn't exist, try to create it
+        if (error.message.includes('not found') || error.message.includes('does not exist')) {
+          console.log('🔧 Bucket not found, attempting to create...')
+          const bucketResult = await this.createBucket()
+          if (bucketResult.success) {
+            // Retry upload after creating bucket
+            const retryResult = await client.storage
+              .from(this.BUCKET_NAME)
+              .upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false
+              })
+            
+            if (retryResult.error) {
+              return { success: false, error: retryResult.error.message }
+            }
+            
+            const { data: publicUrlData } = client.storage
+              .from(this.BUCKET_NAME)
+              .getPublicUrl(fileName)
+
+            return {
+              success: true,
+              url: retryResult.data.path,
+              publicUrl: publicUrlData.publicUrl
+            }
+          }
+        }
+        
         return { success: false, error: error.message }
       }
 
       // Get public URL
-      const { data: publicUrlData } = supabaseAdmin.storage
+      const { data: publicUrlData } = client.storage
         .from(this.BUCKET_NAME)
         .getPublicUrl(fileName)
+
+      console.log('✅ Upload successful:', { path: data.path, publicUrl: publicUrlData.publicUrl })
 
       return {
         success: true,
@@ -56,7 +94,7 @@ export class ImageUploadService {
       }
 
     } catch (error: any) {
-      console.error('Upload failed:', error)
+      console.error('❌ Upload failed:', error)
       return { success: false, error: error.message }
     }
   }
@@ -181,33 +219,60 @@ export class ImageUploadService {
   }
 
   /**
+   * Ensure bucket exists (create if not)
+   */
+  static async ensureBucketExists(): Promise<void> {
+    try {
+      const client = supabaseAdmin || supabase
+      if (!client) return
+
+      // Check if bucket exists by trying to list files
+      const { error: listError } = await client.storage
+        .from(this.BUCKET_NAME)
+        .list('', { limit: 1 })
+
+      if (listError && listError.message.includes('not found')) {
+        console.log('🔧 Bucket does not exist, creating...')
+        await this.createBucket()
+      }
+    } catch (error) {
+      console.log('🔧 Could not check bucket existence:', error)
+    }
+  }
+
+  /**
    * Create storage bucket (run once during setup)
    */
   static async createBucket(): Promise<{ success: boolean; error?: string }> {
     try {
-      if (!supabaseAdmin) {
-        return { success: false, error: 'Admin client not configured' }
+      const client = supabaseAdmin || supabase
+      if (!client) {
+        return { success: false, error: 'Supabase client not configured' }
       }
 
+      console.log('🔧 Creating storage bucket:', this.BUCKET_NAME)
+
       // Create bucket
-      const { error: bucketError } = await supabaseAdmin.storage
+      const { error: bucketError } = await client.storage
         .createBucket(this.BUCKET_NAME, {
           public: true,
           allowedMimeTypes: this.ALLOWED_TYPES,
           fileSizeLimit: this.MAX_FILE_SIZE
         })
 
-      if (bucketError && !bucketError.message.includes('already exists')) {
+      if (bucketError) {
+        if (bucketError.message.includes('already exists')) {
+          console.log('✅ Bucket already exists:', this.BUCKET_NAME)
+          return { success: true }
+        }
+        console.error('❌ Failed to create bucket:', bucketError)
         return { success: false, error: bucketError.message }
       }
 
-      // Set bucket policy for public read
-      const { error: policyError } = await supabaseAdmin.storage
-        .from(this.BUCKET_NAME)
-        .createSignedUrl('test', 60) // This will fail if bucket doesn't exist
-
+      console.log('✅ Bucket created successfully:', this.BUCKET_NAME)
       return { success: true }
     } catch (error: any) {
+      console.error('❌ Create bucket failed:', error)
       return { success: false, error: error.message }
     }
   }

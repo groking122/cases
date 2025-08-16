@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   experimental: {
     serverMinification: true,
   },
@@ -13,7 +12,7 @@ const nextConfig: NextConfig = {
     // Unblock production build despite ESLint errors (you can re-enable later)
     ignoreDuringBuilds: true,
   },
-  // Configure images for Supabase storage
+  // Configure images for Supabase storage - Alternative JS config
   images: {
     remotePatterns: [
       {
@@ -22,7 +21,14 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
+    domains: ['kavzamtcbepdjmmsjsuj.supabase.co'], // Legacy fallback
   },
   webpack: (config) => {
     // Ensure WASM files from cardano-serialization-lib-nodejs are handled in server build
@@ -39,4 +45,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;

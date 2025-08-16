@@ -51,6 +51,7 @@ export default function WalletBalance({
   const [creditChange, setCreditChange] = useState<{amount: number, show: boolean}>({amount: 0, show: false})
   const previousCredits = useRef<number>(0)
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasFetchedInitial = useRef<boolean>(false)
 
   // Smooth credit animation when credits change
   const animateCreditsChange = (newCredits: number, oldCredits: number) => {
@@ -100,7 +101,7 @@ export default function WalletBalance({
       console.error('Failed to fetch credits:', error)
     }
     return 0
-  }, [connected, wallet, externalWalletAddress])
+  }, [connected, externalWalletAddress]) // Removed wallet dependency to prevent recreation
 
   // Instant credit update (called externally)
   const updateCreditsInstantly = async (expectedCredits: number | undefined = undefined) => {
@@ -137,6 +138,32 @@ export default function WalletBalance({
     }
   }
 
+  // Simplified ADA balance fetcher  
+  const fetchAdaBalance = useCallback(async () => {
+    if (!connected || !wallet) return 0
+
+    try {
+      console.log('💰 Fetching ADA balance...')
+      const balanceValue = await wallet.getBalance()
+      console.log('💰 Raw wallet balance:', balanceValue)
+
+      if (Array.isArray(balanceValue)) {
+        const adaAsset = balanceValue.find(asset => asset.unit === 'lovelace')
+        if (adaAsset) {
+          const adaBalance = parseInt(adaAsset.quantity) / 1000000
+          console.log('💰 ADA balance found:', adaBalance)
+          return adaBalance
+        }
+      }
+      
+      console.log('💰 No ADA balance found in response')
+      return 0
+    } catch (error) {
+      console.error('❌ Error fetching ADA balance:', error)
+      return 0
+    }
+  }, [connected, wallet])
+
   // Enhanced balance fetcher with smooth updates
   const fetchBalance = useCallback(async (showCreditAnimation = true) => {
     if (!connected) return
@@ -146,22 +173,17 @@ export default function WalletBalance({
     try {
       let adaBalance = 0
       
-      // Only fetch ADA balance if we have a wallet connection and no external balance
-      if (wallet && cardanoBalance === undefined) {
-        const balanceValue = await wallet.getBalance()
-
-        if (Array.isArray(balanceValue)) {
-          const adaAsset = balanceValue.find(asset => asset.unit === 'lovelace')
-          if (adaAsset) {
-            adaBalance = parseInt(adaAsset.quantity) / 1000000
-          }
-        }
-      } else if (cardanoBalance !== undefined) {
+      // Fetch ADA balance if no external balance provided
+      if (cardanoBalance === undefined) {
+        adaBalance = await fetchAdaBalance()
+      } else {
         adaBalance = cardanoBalance
       }
 
       // Get credits with animation
       const credits = showCredits ? await fetchCredits(showCreditAnimation) : 0
+
+      console.log('💰 Final balances - ADA:', adaBalance, 'Credits:', credits)
 
       // Only update if values actually changed to prevent unnecessary re-renders
       setBalance(prev => {
@@ -196,31 +218,51 @@ export default function WalletBalance({
         error: 'Failed to fetch balance' 
       }))
     }
-  }, [connected, wallet, cardanoBalance, showCredits, fetchCredits, onCreditsChange])
+  }, [connected, cardanoBalance, showCredits, fetchCredits, fetchAdaBalance]) // Removed onCreditsChange to prevent recreation
 
-  // Use external credits if provided, otherwise fetch them
+  // Use external credits if provided, otherwise fetch them ONCE
   useEffect(() => {
     if (externalCredits !== undefined) {
       console.log('💰 WalletBalance: Using external credits:', externalCredits)
-      setBalance(prev => ({ 
-        ...prev, 
-        credits: externalCredits,
-        lastUpdate: Date.now()
-      }))
-      if (onCreditsChange) {
+      setBalance(prev => {
+        // Only update if credits actually changed to prevent unnecessary re-renders
+        if (prev.credits !== externalCredits) {
+          return { 
+            ...prev, 
+            credits: externalCredits,
+            lastUpdate: Date.now()
+          }
+        }
+        return prev
+      })
+      if (onCreditsChange && externalCredits !== balance.credits) {
         onCreditsChange(externalCredits)
       }
-    } else if (connected) {
-      console.log('💰 WalletBalance: Fetching own credits')
-      fetchBalance(false) // Don't show animation on first load
+    } else if (connected && wallet && !hasFetchedInitial.current) {
+      console.log('💰 WalletBalance: Initial fetch for connected wallet')
+      hasFetchedInitial.current = true
+      
+      // Direct fetch without complex timing
+      fetchBalance(false)
     }
-  }, [connected, externalCredits])
+    
+    // Reset fetch flag when wallet disconnects
+    if (!connected) {
+      hasFetchedInitial.current = false
+    }
+  }, [connected, wallet, externalCredits]) // Removed fetchBalance from dependencies
   
   // Update ADA balance when external cardanoBalance is provided
   useEffect(() => {
     if (cardanoBalance !== undefined) {
       console.log('💰 WalletBalance: Using external ADA balance:', cardanoBalance)
-      setBalance(prev => ({ ...prev, ada: cardanoBalance }))
+      setBalance(prev => {
+        // Only update if ADA balance actually changed
+        if (prev.ada !== cardanoBalance) {
+          return { ...prev, ada: cardanoBalance }
+        }
+        return prev
+      })
     }
   }, [cardanoBalance])
 
@@ -231,13 +273,13 @@ export default function WalletBalance({
     }
   }, [forceRefresh, connected])
 
-  // Auto-refresh credits every 30 seconds if connected (without animation to prevent shaking)
+  // Auto-refresh credits every 60 seconds if connected (without animation to prevent shaking)
   useEffect(() => {
     if (!connected || !showCredits) return
 
-    const interval = setInterval(() => fetchBalance(false), 30000)
+    const interval = setInterval(() => fetchBalance(false), 60000)
     return () => clearInterval(interval)
-  }, [connected, showCredits])
+  }, [connected, showCredits]) // Removed fetchBalance dependency to prevent recreating interval
 
   // Debug function to troubleshoot issues
   const debugWallet = async () => {
@@ -310,11 +352,14 @@ export default function WalletBalance({
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-gradient-to-br from-black/90 to-gray-900/90 backdrop-blur-md border border-orange-500/30 rounded-2xl p-4 shadow-2xl relative overflow-hidden min-w-[280px] min-h-[100px] will-change-transform"
+      className="bg-gradient-to-br from-black/90 to-gray-900/90 backdrop-blur-md border border-orange-500/30 rounded-2xl p-3 shadow-2xl relative overflow-hidden will-change-transform"
       style={{ 
         backfaceVisibility: 'hidden',
         perspective: 1000,
-        transform: 'translate3d(0, 0, 0)'
+        transform: 'translate3d(0, 0, 0)',
+        minWidth: '280px',
+        height: '88px',
+        maxWidth: '320px'
       }}
     >
       {/* Subtle update indicator */}
@@ -331,78 +376,76 @@ export default function WalletBalance({
       </AnimatePresence>
 
       {balance.loading ? (
-        <div className="space-y-3 relative z-10">
+        <div className="relative z-10 h-full flex flex-col justify-between">
           {/* Header */}
-          <div className="text-center border-b border-gray-700/50 pb-2">
+          <div className="text-center border-b border-gray-700/50 pb-1">
             <h3 className="text-sm font-bold bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
               Wallet Balance
             </h3>
           </div>
 
-          {/* Loading state with same layout */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Loading state with horizontal layout */}
+          <div className="flex items-center justify-between gap-4 py-1 flex-1">
             {/* ADA Loading */}
-            <div className="text-center">
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-6 h-6 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white text-xs font-bold font-jetbrains">₳</span>
-                </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
+                <span className="text-white text-xs font-bold font-jetbrains">₳</span>
+              </div>
+              <div>
                 <div className="text-orange-400 font-bold text-xs font-jetbrains">ADA</div>
-                <div className="text-orange-400 font-bold text-lg animate-pulse">--</div>
+                <div className="text-orange-400 font-bold text-sm animate-pulse">--</div>
               </div>
             </div>
+
+            {/* Separator */}
+            <div className="w-px h-8 bg-gray-600/50"></div>
 
             {/* Credits Loading */}
-            <div className="text-center">
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-6 h-6 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
-                  <span className="text-black text-xs font-bold font-jetbrains">C</span>
-                </div>
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg flex items-center justify-center">
+                <span className="text-black text-xs font-bold font-jetbrains">C</span>
+              </div>
+              <div>
                 <div className="text-yellow-400 font-bold text-xs font-jetbrains">CREDITS</div>
-                <div className="text-yellow-400 font-bold text-lg animate-pulse">--</div>
+                <div className="text-yellow-400 font-bold text-sm animate-pulse">--</div>
               </div>
             </div>
-          </div>
 
-          {/* Loading refresh button */}
-          <div className="flex justify-center items-center pt-2 border-t border-gray-700/50">
-            <motion.div
-              className="px-3 py-1 rounded-lg text-xs text-gray-400 font-jetbrains border border-gray-600"
-            >
-              <div className="flex items-center gap-1">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-2 h-2 border border-orange-400 border-t-transparent rounded-full"
-                />
-                UPDATING
-              </div>
-            </motion.div>
+            {/* Loading refresh button */}
+            <div className="px-3 py-2 rounded-lg border border-gray-600 flex items-center justify-center flex-shrink-0" style={{ minWidth: '32px', height: '32px' }}>
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-3 h-3 border border-orange-400 border-t-transparent rounded-full"
+              />
+            </div>
           </div>
         </div>
       ) : balance.error ? (
-        <div className="space-y-3 relative z-10">
+        <div className="relative z-10 h-full flex flex-col justify-between">
           {/* Header */}
-          <div className="text-center border-b border-gray-700/50 pb-2">
+          <div className="text-center border-b border-gray-700/50 pb-1">
             <h3 className="text-sm font-bold bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
               Wallet Balance
             </h3>
           </div>
-          <div className="text-red-400 text-sm text-center">
-            {balance.error}
+          <div className="flex items-center justify-center flex-1">
+            <div className="text-red-400 text-sm text-center">
+              {balance.error}
+            </div>
           </div>
         </div>
       ) : (
-        <div className="space-y-3 relative z-10">
+        <div className="relative z-10 h-full flex flex-col justify-between">
           {/* Header */}
-          <div className="text-center border-b border-gray-700/50 pb-2">
+          <div className="text-center border-b border-gray-700/50 pb-1">
             <h3 className="text-sm font-bold bg-gradient-to-r from-orange-400 to-yellow-400 bg-clip-text text-transparent">
               Wallet Balance
             </h3>
           </div>
 
           {/* Horizontal layout for ADA and Credits */}
-          <div className="flex items-center justify-between gap-6 py-1">
+          <div className="flex items-center justify-between gap-4 py-1 flex-1">
             {/* ADA Balance */}
             <div className="flex items-center gap-2">
               <div className="w-5 h-5 bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
@@ -410,15 +453,12 @@ export default function WalletBalance({
               </div>
               <div>
                 <div className="text-orange-400 font-bold text-xs font-jetbrains">ADA</div>
-                <motion.span 
+                <span 
                   className="text-orange-400 font-bold text-sm"
-                  key={`ada-${balance.ada}-${balance.lastUpdate || 0}`}
-                  initial={{ scale: 1 }}
-                  animate={{ scale: 1 }}
                   style={{ display: 'inline-block', minWidth: '2.5rem', textAlign: 'left' }}
                 >
                   {balance.ada.toFixed(2)}
-                </motion.span>
+                </span>
               </div>
             </div>
 
@@ -433,16 +473,12 @@ export default function WalletBalance({
                 </div>
                 <div>
                   <div className="text-yellow-400 font-bold text-xs font-jetbrains">CREDITS</div>
-                  <motion.span 
+                  <span 
                     className="text-yellow-400 font-bold text-sm"
-                    key={`credits-${balance.credits}-${balance.lastUpdate || 0}`}
-                    initial={{ scale: 1, color: "#FBBF24" }}
-                    animate={{ scale: 1, color: "#FBBF24" }}
-                    transition={{ duration: 0.2 }}
                     style={{ display: 'inline-block', minWidth: '3rem', textAlign: 'left' }}
                   >
                     {balance.credits.toLocaleString()}
-                  </motion.span>
+                  </span>
 
                   {/* Credit change indicator */}
                   <AnimatePresence>
@@ -463,13 +499,13 @@ export default function WalletBalance({
               </div>
             )}
 
-            {/* Refresh button - inline */}
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            {/* Refresh button - more visible */}
+            <button
               onClick={() => fetchBalance(true)}
               disabled={balance.loading}
-              className="px-2 py-1 rounded-lg text-xs text-gray-400 hover:text-orange-400 transition-all duration-200 font-jetbrains border border-gray-600 hover:border-orange-400/50"
+              className="px-3 py-2 rounded-lg text-xs text-gray-400 hover:text-orange-400 hover:bg-gray-700/50 transition-all duration-200 font-jetbrains border border-gray-600 hover:border-orange-400/50 flex items-center justify-center flex-shrink-0"
+              style={{ minWidth: '32px', height: '32px' }}
+              title="Refresh Balance"
             >
               {balance.loading ? (
                 <motion.div
@@ -478,9 +514,9 @@ export default function WalletBalance({
                   className="w-3 h-3 border border-orange-400 border-t-transparent rounded-full"
                 />
               ) : (
-                <span className="text-xs">🔄</span>
+                <span className="text-sm">🔄</span>
               )}
-            </motion.button>
+            </button>
           </div>
 
 

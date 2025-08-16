@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Image Upload</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #1a1a1a; color: white; }
+        .debug-section { background: #333; padding: 15px; margin: 10px 0; border-radius: 8px; }
+        button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #45a049; }
+        .error { color: #ff6b6b; }
+        .success { color: #51cf66; }
+        pre { background: #222; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        input[type="file"] { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Image Upload Debug Tool</h1>
+    
+    <div class="debug-section">
+        <h2>📋 System Status</h2>
+        <button onclick="checkStorageStatus()">Check Storage Status</button>
+        <button onclick="initializeStorage()">Initialize Storage</button>
+        <pre id="status-result"></pre>
+    </div>
+
+    <div class="debug-section">
+        <h2>📤 Test Image Upload</h2>
+        <input type="file" id="testFile" accept="image/*">
+        <select id="folderSelect">
+            <option value="symbols">Symbols</option>
+            <option value="cases">Cases</option>
+            <option value="icons">Icons</option>
+        </select>
+        <button onclick="testUpload()">Test Upload</button>
+        <pre id="upload-result"></pre>
+    </div>
+
+    <div class="debug-section">
+        <h2>📁 Local Upload Directories</h2>
+        <button onclick="checkDirectories()">Check Directories</button>
+        <pre id="directories-result"></pre>
+    </div>
+
+    <script>
+        const log = (elementId, message, isError = false) => {
+            const element = document.getElementById(elementId);
+            element.innerHTML = message;
+            element.className = isError ? 'error' : 'success';
+            console.log(message);
+        };
+
+        async function checkStorageStatus() {
+            try {
+                log('status-result', '🔧 Checking storage status...');
+                
+                const response = await fetch('/api/admin/setup-storage');
+                const result = await response.json();
+                
+                log('status-result', JSON.stringify(result, null, 2), !result.success);
+            } catch (error) {
+                log('status-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+
+        async function initializeStorage() {
+            try {
+                log('status-result', '🔧 Initializing storage...');
+                
+                const response = await fetch('/api/admin/setup-storage', { method: 'POST' });
+                const result = await response.json();
+                
+                log('status-result', JSON.stringify(result, null, 2), !result.success);
+            } catch (error) {
+                log('status-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+
+        async function testUpload() {
+            const fileInput = document.getElementById('testFile');
+            const folderSelect = document.getElementById('folderSelect');
+            
+            if (!fileInput.files[0]) {
+                log('upload-result', '❌ Please select a file first', true);
+                return;
+            }
+
+            try {
+                log('upload-result', '🔧 Starting upload test...');
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                formData.append('folder', folderSelect.value);
+                formData.append('isAdmin', 'true');
+
+                console.log('📤 Uploading:', {
+                    fileName: fileInput.files[0].name,
+                    fileSize: fileInput.files[0].size,
+                    folder: folderSelect.value
+                });
+
+                const response = await fetch('/api/upload-image', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                log('upload-result', JSON.stringify(result, null, 2), !result.success);
+                
+                if (result.success) {
+                    // Test if the uploaded image is accessible
+                    const img = new Image();
+                    img.onload = () => log('upload-result', 
+                        log('upload-result', `✅ Upload successful!\\n${JSON.stringify(result, null, 2)}\\n\\n🖼️ Image accessible at: ${result.url}`, false)
+                    );
+                    img.onerror = () => log('upload-result', 
+                        `⚠️ Upload successful but image not accessible:\\n${JSON.stringify(result, null, 2)}`, true
+                    );
+                    img.src = result.url;
+                }
+            } catch (error) {
+                log('upload-result', `❌ Upload failed: ${error.message}`, true);
+            }
+        }
+
+        async function checkDirectories() {
+            try {
+                log('directories-result', '🔧 Checking upload directories...');
+                
+                const directories = ['symbols', 'cases', 'icons'];
+                let results = [];
+                
+                for (const dir of directories) {
+                    try {
+                        const response = await fetch(`/uploads/${dir}/test.txt`);
+                        results.push(`📁 /uploads/${dir}/: ${response.status === 404 ? 'Directory exists' : 'Status ' + response.status}`);
+                    } catch (error) {
+                        results.push(`📁 /uploads/${dir}/: Directory accessible`);
+                    }
+                }
+                
+                log('directories-result', results.join('\\n'));
+            } catch (error) {
+                log('directories-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+
+        // Auto-check status on load
+        window.onload = () => {
+            checkStorageStatus();
+            checkDirectories();
+        };
+    </script>
+</body>
+</html>

@@ -10,6 +10,7 @@ import SymbolLibrary from '@/components/admin/SymbolLibrary'
 import SymbolCreator from '@/components/admin/SymbolCreator'
 import SymbolEditor from '@/components/admin/SymbolEditor'
 import AdminAnalytics from '@/components/admin/AdminAnalytics'
+import WithdrawalRequests from '@/components/admin/WithdrawalRequests'
 
 interface AdminDashboardProps {
   initialStats: AdminDashboardStats
@@ -17,7 +18,7 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'withdrawals'>('dashboard')
   const [stats, setStats] = useState<AdminDashboardStats | null>(null)
   const [cases, setCases] = useState<CaseConfig[]>([])
   const [symbols, setSymbols] = useState<Symbol[]>([])
@@ -110,6 +111,7 @@ export default function AdminDashboard() {
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'cases', label: 'Cases', icon: '📦' },
     { id: 'symbols', label: 'Symbols', icon: '💎' },
+    { id: 'withdrawals', label: 'Withdrawals', icon: '💸' },
     { id: 'analytics', label: 'Analytics', icon: '📈' }
   ] as const
 
@@ -318,6 +320,10 @@ export default function AdminDashboard() {
                 }
               }}
             />
+          )}
+
+          {activeTab === 'withdrawals' && (
+            <WithdrawalRequests />
           )}
 
           {activeTab === 'analytics' && stats && (

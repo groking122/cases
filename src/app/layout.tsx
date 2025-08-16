@@ -18,8 +18,13 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Case Opening Casino",
-  description: "Premium case opening experience with blockchain security",
+  title: "FudCoin",
+  description: "Premium case opening experience with blockchain security powered by FudCoin",
+  icons: {
+    icon: "/logo.jpg",
+    shortcut: "/logo.jpg",
+    apple: "/logo.jpg",
+  },
 };
 
 export default function RootLayout({

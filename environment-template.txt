@@ -1,0 +1,13 @@
+# 🔧 Environment Variables for Image Upload & Database
+# Copy this content to a file named .env.local in your project root
+
+# Supabase Configuration (Required for image upload)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-anon-key-here
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-service-role-key-here
+
+# Blockfrost (for wallet functionality)
+NEXT_PUBLIC_BLOCKFROST_PROJECT_ID=your-blockfrost-project-id
+
+# Other configurations
+NODE_ENV=development

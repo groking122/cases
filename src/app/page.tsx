@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 
 import toast from 'react-hot-toast'
 import WalletBalance from "@/components/WalletBalance"
+import { WalletErrorHandler } from "@/components/WalletErrorHandler"
 
 import WalletSelector from "@/components/WalletSelector"
 import PlayerInventory from "@/components/PlayerInventory"
@@ -72,6 +73,7 @@ export default function Home() {
   // Credit System
   const [userCredits, setUserCredits] = useState<UserCredits>({ credits: 0, loading: false })
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [adaBalance, setAdaBalance] = useState<number>(0)
   
   // Inventory System
   const [showInventory, setShowInventory] = useState(false)
@@ -172,7 +174,7 @@ export default function Home() {
     }
   }, [connected, wallet])
 
-  // Fetch user credits
+  // Fetch user credits and ADA balance
   const fetchUserCredits = async () => {
     if (!connected || !wallet) return
 
@@ -182,6 +184,7 @@ export default function Home() {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
       
+      // Fetch credits
       const response = await fetch('/api/get-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,8 +196,26 @@ export default function Home() {
         const newCredits = data.credits || 0
         setUserCredits({ credits: newCredits, loading: false })
         console.log('💰 Credits fetched:', newCredits)
-        return newCredits
       }
+
+      // Fetch ADA balance directly
+      try {
+        console.log('💰 Fetching ADA balance in main page...')
+        const balanceValue = await wallet.getBalance()
+        console.log('💰 Main page balance response:', balanceValue)
+        
+        if (Array.isArray(balanceValue)) {
+          const adaAsset = balanceValue.find(asset => asset.unit === 'lovelace')
+          if (adaAsset) {
+            const newAdaBalance = parseInt(adaAsset.quantity) / 1000000
+            setAdaBalance(newAdaBalance)
+            console.log('💰 ADA balance set in main page:', newAdaBalance)
+          }
+        }
+      } catch (adaError) {
+        console.error('❌ Failed to fetch ADA balance in main page:', adaError)
+      }
+      
     } catch (error) {
       console.error('Failed to fetch credits:', error)
     }
@@ -422,15 +443,18 @@ export default function Home() {
   // Show wallet connection screen if not connected
   if (!connected) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="max-w-md w-full">
-          <div className="minimal-card text-center">
-            <h1 className="text-3xl font-bold text-white mb-4">
-              🎮 Case Opening
-            </h1>
-            <p className="text-gray-400 mb-6">
-              Connect wallet to start
-            </p>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white flex items-center justify-center p-4">
+        <WalletErrorHandler />
+        <div className="max-w-lg w-full">
+          <div className="bg-black/40 backdrop-blur-md rounded-2xl p-8 border border-gray-700 shadow-2xl">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
+                FudCoin
+              </h1>
+              <p className="text-gray-300 text-lg">
+                Connect your Cardano wallet to start opening cases
+              </p>
+            </div>
 
             <WalletSelector
               onWalletSelect={handleWalletSelect}
@@ -446,6 +470,7 @@ export default function Home() {
   // Main casino interface
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white">
+      <WalletErrorHandler />
       {/* Navigation Header */}
       <motion.header 
         initial={{ y: -100 }}
@@ -458,10 +483,14 @@ export default function Home() {
             className="flex items-center gap-3"
             whileHover={{ scale: 1.05 }}
           >
-            <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-lg">🎮</span>
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-600">
+              <img 
+                src="/logo.jpg"
+                alt="FudCoin Logo"
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Case Opening</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">FudCoin</span>
           </motion.div>
 
           {/* Navigation Links - Centered */}
@@ -474,72 +503,66 @@ export default function Home() {
               Cases
             </motion.a>
             <Link href="/inventory" className="text-gray-300 hover:text-white transition-colors">
-              <motion.span whileHover={{ scale: 1.1 }}>Inventory</motion.span>
+              <motion.span whileHover={{ scale: 1.1 }}>Stash</motion.span>
             </Link>
             <motion.a 
-              href="#leaderboard" 
+              href="#rules" 
               className="text-gray-300 hover:text-white transition-colors"
               whileHover={{ scale: 1.1 }}
             >
-              Leaderboard
+              Rules
             </motion.a>
           </nav>
 
-          {/* Wallet Balance & Buy Credits - Header Right */}
+          {/* Right side - Add Credits, Connected Status, Wallet Balance */}
           <div className="hidden md:flex items-center gap-3">
-            <motion.div
-              initial={{ x: 100 }}
-              animate={{ x: 0 }}
-              transition={{ delay: 0.04 }}
-            >
-              <WalletBalance
-                connected={connected}
-                credits={userCredits.credits}
-                forceRefresh={refreshTrigger}
-                onCreditsChange={(credits) => setUserCredits(prev => ({ ...prev, credits }))}
-              />
-            </motion.div>
-            
             <motion.button
               onClick={handleInstantPurchaseOpen}
-              className="bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:from-green-500 hover:to-emerald-500 transition-all shadow-lg"
+              className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 rounded-xl font-medium hover:from-orange-500 hover:to-red-500 transition-all shadow-lg border border-orange-500/30 backdrop-blur-sm"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               initial={{ x: 100 }}
               animate={{ x: 0 }}
-              transition={{ delay: 0.06 }}
+              transition={{ delay: 0.04 }}
             >
-              💳 Buy Credits
+              💳 Add Credits
             </motion.button>
             
             {connected && (
               <motion.div
-                className="bg-black/80 text-green-400 px-3 py-1 rounded-lg text-sm backdrop-blur-sm border border-green-500/30"
+                className="bg-gradient-to-r from-gray-900/90 to-black/90 text-green-400 px-3 py-2 rounded-xl text-sm backdrop-blur-sm border border-green-500/30 shadow-lg"
                 initial={{ x: 100 }}
                 animate={{ x: 0 }}
-                transition={{ delay: 0.1 }}
+                transition={{ delay: 0.06 }}
               >
                 🟢 Connected
               </motion.div>
             )}
+            
+            <motion.div
+              initial={{ x: 100 }}
+              animate={{ x: 0 }}
+              transition={{ delay: 0.08 }}
+            >
+              <WalletBalance
+                connected={connected}
+                credits={userCredits.credits}
+                cardanoBalance={adaBalance}
+                forceRefresh={refreshTrigger}
+                onCreditsChange={(credits) => setUserCredits(prev => ({ ...prev, credits }))}
+              />
+            </motion.div>
           </div>
 
-          {/* Mobile Menu Button & Credits */}
-          <div className="md:hidden flex items-center gap-2">
-            <motion.button 
-              onClick={() => router.push('/credits')}
-              className="bg-gradient-to-r from-yellow-500 to-orange-500 text-black px-3 py-1 rounded-lg font-bold text-sm"
-              whileHover={{ scale: 1.05 }}
-            >
-              💰 {userCredits.credits}
-            </motion.button>
-            <button className="p-2">
-              <div className="w-6 h-6 flex flex-col justify-center gap-1">
-                <div className="w-full h-0.5 bg-white"></div>
-                <div className="w-full h-0.5 bg-white"></div>
-                <div className="w-full h-0.5 bg-white"></div>
-              </div>
-            </button>
+          {/* Mobile Wallet Balance */}
+          <div className="md:hidden">
+            <WalletBalance
+              connected={connected}
+              credits={userCredits.credits}
+              cardanoBalance={adaBalance}
+              forceRefresh={refreshTrigger}
+              onCreditsChange={(credits) => setUserCredits(prev => ({ ...prev, credits }))}
+            />
           </div>
         </div>
       </motion.header>
@@ -650,49 +673,67 @@ export default function Home() {
             {availableCases.map((caseItem, index) => (
               <motion.div
                 key={caseItem.id}
-                className="bg-black/40 backdrop-blur-md rounded-2xl p-6 border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group cursor-pointer"
+                className="bg-black/40 backdrop-blur-md rounded-2xl overflow-hidden border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group cursor-pointer shadow-xl hover:shadow-2xl"
                 initial={{ y: 50, opacity: 0 }}
                 whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
-                whileHover={{ scale: 1.05, y: -10 }}
+                whileHover={{ scale: 1.02, y: -5 }}
                 onClick={() => router.push(`/open/${caseItem.id}`)}
               >
-                <div className="h-48 bg-gradient-to-br from-orange-900/40 to-red-900/40 rounded-xl mb-4 flex items-center justify-center relative overflow-hidden">
-                  <motion.div
-                    className="text-4xl"
-                    animate={{ 
-                      rotateY: [0, 360],
-                      scale: [1, 1.2, 1]
-                    }}
-                    transition={{ 
-                      duration: 4, 
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    📦
-                  </motion.div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+                <div className="h-56 bg-gradient-to-br from-orange-900/40 to-red-900/40 flex items-center justify-center relative overflow-hidden">
+                  {caseItem.image_url ? (
+                    <motion.img
+                      src={caseItem.image_url}
+                      alt={caseItem.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800 text-gray-400">
+                      <motion.div
+                        className="text-4xl mb-3"
+                        animate={{ 
+                          rotateY: [0, 360],
+                          scale: [1, 1.1, 1]
+                        }}
+                        transition={{ 
+                          duration: 4, 
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                      >
+                        📦
+                      </motion.div>
+                      <div className="text-xs font-medium opacity-70">Case Preview</div>
+                    </div>
+                  )}
+                  {/* Overlay with case price */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
+                  <div className="absolute top-3 right-3 bg-orange-500/90 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                    {caseItem.price} Credits
+                  </div>
                 </div>
                 
-                <h3 className="text-lg font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">
-                  {caseItem.name}
-                </h3>
-                <p className="text-gray-400 text-sm mb-4">{caseItem.description}</p>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold text-yellow-400">
-                    {caseItem.price}
-                  </span>
-                  <motion.button
-                    className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-4 py-2 rounded-lg font-medium"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => { e.stopPropagation(); router.push(`/open/${caseItem.id}`) }}
-                  >
-                    Open Case
-                  </motion.button>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">
+                    {caseItem.name}
+                  </h3>
+                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{caseItem.description}</p>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-bold text-yellow-400">
+                      {caseItem.price} Credits
+                    </span>
+                    <motion.button
+                      className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-orange-500 hover:to-orange-400 transition-all"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={(e) => { e.stopPropagation(); router.push(`/open/${caseItem.id}`) }}
+                    >
+                      Open Case
+                    </motion.button>
+                  </div>
                 </div>
               </motion.div>
             ))}

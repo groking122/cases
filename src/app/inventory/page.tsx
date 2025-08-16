@@ -31,7 +31,7 @@ export default function InventoryPage() {
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-black/60 rounded-2xl border border-gray-800 p-6 text-center">
           <div className="text-2xl font-bold mb-2">Connect Wallet</div>
-          <p className="text-gray-400 mb-4">Connect your Cardano wallet to view your inventory.</p>
+          <p className="text-gray-400 mb-4">Connect your Cardano wallet to view your credit chest.</p>
           <WalletSelector 
             onWalletSelect={handleWalletSelect} 
             onError={(e) => toast.error(e)} 
@@ -55,9 +55,9 @@ export default function InventoryPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold">🎒</span>
+              <span className="text-white font-bold">💎</span>
             </div>
-            <span className="text-lg font-bold">Your Inventory</span>
+            <span className="text-lg font-bold">Credit Chest</span>
           </div>
           <motion.button
             onClick={() => router.push('/')}

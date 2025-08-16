@@ -9,31 +9,42 @@ export async function POST(request: NextRequest) {
       withdrawalType, 
       paymentMethod, 
       paymentDetails,
-      walletAddress 
+      walletAddress,
+      creditsRequested
     } = await request.json()
 
-    if (!userId || !caseOpeningId || !withdrawalType) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!userId || !withdrawalType) {
+      return NextResponse.json({ error: 'Missing required fields: userId and withdrawalType are required' }, { status: 400 })
     }
 
-    // Get case opening data
+    // For bulk credit withdrawals, creditsRequested is required when caseOpeningId is null
+    if (!caseOpeningId && !creditsRequested) {
+      return NextResponse.json({ error: 'Missing required fields: creditsRequested is required for bulk credit withdrawals' }, { status: 400 })
+    }
+
+    // Get case opening data (if this is for a specific case opening)
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'Database connection not available' }, { status: 500 })
     }
 
-    const { data: caseOpening, error: openingError } = await supabaseAdmin
-      .from('case_openings')
-      .select('*')
-      .eq('id', caseOpeningId)
-      .eq('user_id', userId)
-      .single()
+    let caseOpening = null
+    if (caseOpeningId) {
+      const { data: openingData, error: openingError } = await supabaseAdmin
+        .from('case_openings')
+        .select('*')
+        .eq('id', caseOpeningId)
+        .eq('user_id', userId)
+        .single()
 
-    if (openingError || !caseOpening) {
-      return NextResponse.json({ error: 'Case opening not found' }, { status: 404 })
-    }
+      if (openingError || !openingData) {
+        return NextResponse.json({ error: 'Case opening not found' }, { status: 404 })
+      }
 
-    if (caseOpening.is_withdrawn || caseOpening.withdrawal_requested) {
-      return NextResponse.json({ error: 'Already withdrawn or withdrawal already requested' }, { status: 400 })
+      if (openingData.is_withdrawn || openingData.withdrawal_requested) {
+        return NextResponse.json({ error: 'Already withdrawn or withdrawal already requested' }, { status: 400 })
+      }
+
+      caseOpening = openingData
     }
 
     // Get user data with credit history
@@ -66,12 +77,14 @@ export async function POST(request: NextRequest) {
 
     const lifetimePurchased = purchaseTotal?.reduce((sum, t) => sum + (t.credits_purchased || 0), 0) || 0
     const lifetimeWithdrawn = withdrawalTotal?.reduce((sum, w) => sum + (w.credits_requested || 0), 0) || 0
-    const creditsRequested = caseOpening.reward_value
+    
+    // Determine credits to be requested
+    const creditsToRequest = caseOpening ? caseOpening.reward_value : creditsRequested
 
     // Check if user has enough credits to deduct
-    if (user.credits < creditsRequested) {
+    if (user.credits < creditsToRequest) {
       return NextResponse.json({ 
-        error: `Insufficient credits. You have ${user.credits} credits but need ${creditsRequested} credits to withdraw this item.` 
+        error: `Insufficient credits. You have ${user.credits} credits but need ${creditsToRequest} credits to withdraw this item.` 
       }, { status: 400 })
     }
 
@@ -79,7 +92,7 @@ export async function POST(request: NextRequest) {
     const { data: riskData } = await supabaseAdmin
       .rpc('calculate_risk_score', {
         p_user_id: userId,
-        p_credits_requested: creditsRequested,
+        p_credits_requested: creditsToRequest,
         p_user_lifetime_purchased: lifetimePurchased,
         p_user_lifetime_withdrawn: lifetimeWithdrawn
       })
@@ -97,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 💰 DEDUCT CREDITS IMMEDIATELY when request is made
-    const newCreditBalance = user.credits - creditsRequested
+    const newCreditBalance = user.credits - creditsToRequest
     
     const { error: creditDeductError } = await supabaseAdmin
       .from('users')
@@ -122,10 +135,10 @@ export async function POST(request: NextRequest) {
         payment_method: paymentMethod || 'manual',
         payment_details: paymentDetails || '',
         wallet_address: walletAddress || user?.wallet_address,
-        credits_requested: creditsRequested,
-        symbol_key: caseOpening.symbol_key,
-        symbol_name: caseOpening.symbol_name,
-        symbol_rarity: caseOpening.symbol_rarity,
+        credits_requested: creditsToRequest,
+        symbol_key: caseOpening?.symbol_key || null,
+        symbol_name: caseOpening?.symbol_name || 'Bulk Credit Withdrawal',
+        symbol_rarity: caseOpening?.symbol_rarity || null,
         user_lifetime_purchased_credits: lifetimePurchased,
         user_lifetime_withdrawn_credits: lifetimeWithdrawn,
         risk_score: riskScore,
@@ -155,12 +168,14 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: userId,
         transaction_type: 'withdrawal_request',
-        credits_change: -creditsRequested,
+        credits_change: -creditsToRequest,
         credits_before: user.credits,
         credits_after: newCreditBalance,
         withdrawal_request_id: withdrawalRequest.id,
         case_opening_id: caseOpeningId,
-        description: `Withdrawal requested for ${caseOpening.symbol_name} (${caseOpening.symbol_rarity})`,
+        description: caseOpening 
+          ? `Withdrawal requested for ${caseOpening.symbol_name} (${caseOpening.symbol_rarity})`
+          : `Bulk credit withdrawal requested (${creditsToRequest} credits)`,
         metadata: {
           payment_method: paymentMethod,
           risk_score: riskScore,
@@ -168,24 +183,26 @@ export async function POST(request: NextRequest) {
         }
       })
 
-    // Mark case opening as withdrawal requested
-    await supabaseAdmin
-      .from('case_openings')
-      .update({
-        withdrawal_requested: true,
-        withdrawal_request_id: withdrawalRequest.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', caseOpeningId)
+    // Mark case opening as withdrawal requested (only if there's a specific case opening)
+    if (caseOpeningId && caseOpening) {
+      await supabaseAdmin
+        .from('case_openings')
+        .update({
+          withdrawal_requested: true,
+          withdrawal_request_id: withdrawalRequest.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', caseOpeningId)
+    }
 
     // Send email notification (you can implement this with your preferred email service)
     await sendWithdrawalNotification({
       requestId: withdrawalRequest.id,
       userWallet: walletAddress || user?.wallet_address,
       withdrawalType,
-      amount: caseOpening.credits_won,
-      symbolName: caseOpening.symbol_name,
-      symbolRarity: caseOpening.symbol_rarity,
+      amount: caseOpening?.credits_won || creditsToRequest,
+      symbolName: caseOpening?.symbol_name || 'Bulk Credit Withdrawal',
+      symbolRarity: caseOpening?.symbol_rarity || 'N/A',
       paymentMethod,
       paymentDetails
     })
@@ -195,10 +212,10 @@ export async function POST(request: NextRequest) {
       requestId: withdrawalRequest.id,
       userWallet: walletAddress || user?.wallet_address,
       withdrawalType,
-      creditsRequested,
-      creditsValueUSD: (creditsRequested * 0.01).toFixed(2),
-      symbolName: caseOpening.symbol_name,
-      symbolRarity: caseOpening.symbol_rarity,
+      creditsRequested: creditsToRequest,
+      creditsValueUSD: (creditsToRequest * 0.01).toFixed(2),
+      symbolName: caseOpening?.symbol_name || 'Bulk Credit Withdrawal',
+      symbolRarity: caseOpening?.symbol_rarity || 'N/A',
       paymentMethod,
       paymentDetails,
       riskScore,
@@ -215,7 +232,7 @@ export async function POST(request: NextRequest) {
         ? 'Withdrawal request submitted and flagged for security review. You will be contacted within 24-48 hours.'
         : 'Withdrawal request submitted successfully! Credits have been deducted and you will receive confirmation shortly.',
       requestId: withdrawalRequest.id,
-      creditsDeducted: creditsRequested,
+      creditsDeducted: creditsToRequest,
       newCreditBalance: newCreditBalance,
       status: withdrawalRequest.status,
       estimatedProcessingTime: isSuspicious ? '24-72 hours (security review)' : '24-48 hours',

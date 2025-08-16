@@ -221,7 +221,7 @@ SELECT
   -- Case opening context (use actual column names)
   co.created_at as case_opened_date,
   co.reward_value,
-  co.symbol_key,
+  co.symbol_key as co_symbol_key,
   
   -- Timing analysis
   EXTRACT(EPOCH FROM (wr.created_at - u.created_at))/3600 as hours_since_signup,

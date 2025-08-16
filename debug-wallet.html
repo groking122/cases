@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet Detection Debug</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a1a;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .success {
+            background: #1e3a2e;
+            border-color: #22c55e;
+            color: #bbf7d0;
+        }
+        .error {
+            background: #3a1e1e;
+            border-color: #ef4444;
+            color: #fecaca;
+        }
+        .warning {
+            background: #3a2e1e;
+            border-color: #f59e0b;
+            color: #fed7aa;
+        }
+        .info {
+            background: #1e2a3a;
+            border-color: #3b82f6;
+            color: #bfdbfe;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+        .code {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        .wallet-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .wallet-item {
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid transparent;
+        }
+        .wallet-item.installed {
+            border-color: #22c55e;
+        }
+        .wallet-item.not-installed {
+            border-color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Wallet Detection Diagnostic Tool</h1>
+        <p>This tool helps debug wallet detection issues in your Cardano dApp.</p>
+        
+        <button class="button" onclick="runDiagnostic()">🔄 Run Diagnostic</button>
+        <button class="button" onclick="clearResults()">🗑️ Clear Results</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const supportedWallets = [
+            { key: 'nami', name: 'Nami' },
+            { key: 'eternl', name: 'Eternl' },
+            { key: 'flint', name: 'Flint' },
+            { key: 'typhon', name: 'Typhon' },
+            { key: 'yoroi', name: 'Yoroi' },
+            { key: 'gero', name: 'Gero' },
+            { key: 'lace', name: 'Lace' },
+            { key: 'vespr', name: 'Vespr' },
+            { key: 'nufi', name: 'NuFi' },
+            { key: 'lode', name: 'Lode' },
+            { key: 'begin', name: 'Begin' },
+            { key: 'cardwallet', name: 'CardWallet' }
+        ];
+
+        function addStatus(type, title, message) {
+            const resultsDiv = document.getElementById('results');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>${title}</strong><br>${message}`;
+            resultsDiv.appendChild(statusDiv);
+        }
+
+        function addCode(title, code) {
+            const resultsDiv = document.getElementById('results');
+            const codeDiv = document.createElement('div');
+            codeDiv.innerHTML = `<strong>${title}:</strong><div class="code">${code}</div>`;
+            resultsDiv.appendChild(codeDiv);
+        }
+
+        function runDiagnostic() {
+            clearResults();
+            
+            addStatus('info', 'Starting Diagnostic', 'Checking wallet detection...');
+            
+            // Check if window.cardano exists
+            if (typeof window.cardano === 'undefined') {
+                addStatus('error', 'No Cardano Object', 'window.cardano is undefined. No Cardano wallets are installed or they haven\'t loaded yet.');
+                return;
+            }
+            
+            addStatus('success', 'Cardano Object Found', 'window.cardano exists');
+            
+            // Show available wallet keys
+            const availableKeys = Object.keys(window.cardano);
+            addCode('Available Wallet Keys', JSON.stringify(availableKeys, null, 2));
+            
+            if (availableKeys.length === 0) {
+                addStatus('warning', 'Empty Cardano Object', 'window.cardano exists but contains no wallet extensions');
+                return;
+            }
+            
+            // Check each supported wallet
+            const detectedWallets = [];
+            const walletListDiv = document.createElement('div');
+            walletListDiv.className = 'wallet-list';
+            
+            supportedWallets.forEach(wallet => {
+                const walletDiv = document.createElement('div');
+                walletDiv.className = 'wallet-item';
+                
+                try {
+                    const isInstalled = !!(
+                        window.cardano[wallet.key] &&
+                        typeof window.cardano[wallet.key] === 'object' &&
+                        (typeof window.cardano[wallet.key].enable === 'function' || 
+                         typeof window.cardano[wallet.key].isEnabled === 'function')
+                    );
+                    
+                    if (isInstalled) {
+                        detectedWallets.push(wallet);
+                        walletDiv.className += ' installed';
+                        walletDiv.innerHTML = `
+                            <strong>✅ ${wallet.name}</strong><br>
+                            <small>Key: ${wallet.key}</small><br>
+                            <small>Status: Detected & Ready</small>
+                        `;
+                    } else {
+                        walletDiv.className += ' not-installed';
+                        const reason = window.cardano[wallet.key] ? 'Invalid API' : 'Not Found';
+                        walletDiv.innerHTML = `
+                            <strong>❌ ${wallet.name}</strong><br>
+                            <small>Key: ${wallet.key}</small><br>
+                            <small>Status: ${reason}</small>
+                        `;
+                    }
+                } catch (error) {
+                    walletDiv.className += ' not-installed';
+                    walletDiv.innerHTML = `
+                        <strong>⚠️ ${wallet.name}</strong><br>
+                        <small>Key: ${wallet.key}</small><br>
+                        <small>Error: ${error.message}</small>
+                    `;
+                }
+                
+                walletListDiv.appendChild(walletDiv);
+            });
+            
+            document.getElementById('results').appendChild(walletListDiv);
+            
+            // Summary
+            if (detectedWallets.length > 0) {
+                addStatus('success', 'Wallets Detected', `Found ${detectedWallets.length} working wallet(s): ${detectedWallets.map(w => w.name).join(', ')}`);
+                
+                // Test connection to first wallet
+                const firstWallet = detectedWallets[0];
+                addStatus('info', 'Testing Connection', `Attempting to test ${firstWallet.name} wallet...`);
+                
+                window.cardano[firstWallet.key].enable().then(() => {
+                    addStatus('success', 'Connection Test', `Successfully connected to ${firstWallet.name}!`);
+                }).catch(error => {
+                    addStatus('warning', 'Connection Test', `Connection to ${firstWallet.name} failed: ${error.message}`);
+                });
+                
+            } else {
+                addStatus('error', 'No Wallets Detected', 'No supported wallets were found. Please install a Cardano wallet extension and refresh this page.');
+            }
+            
+            // Show raw cardano object
+            addCode('Raw window.cardano Object', JSON.stringify(window.cardano, (key, value) => {
+                if (typeof value === 'function') return '[Function]';
+                if (value instanceof Object && Object.keys(value).length > 10) return '[Complex Object]';
+                return value;
+            }, 2));
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-run on load
+        setTimeout(runDiagnostic, 500);
+    </script>
+</body>
+</html>
