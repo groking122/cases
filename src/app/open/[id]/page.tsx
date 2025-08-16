@@ -13,6 +13,7 @@ export default function OpenCasePage() {
   const router = useRouter()
   const { connected, wallet, connect, connecting } = useWallet()
   const [userCredits, setUserCredits] = useState<number | null>(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const [caseData, setCaseData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
@@ -31,6 +32,8 @@ export default function OpenCasePage() {
             router.push('/')
             return
           }
+          console.log('🎮 Case data loaded:', found)
+          console.log('🎯 Case symbols:', found.symbols)
            setCaseData(found)
         } else {
           toast.error('Failed to load case')
@@ -47,7 +50,7 @@ export default function OpenCasePage() {
     load()
   }, [params.id, router])
 
-  // Fetch credits when connected
+  // Fetch credits when connected or after case opening (refreshTrigger)
   useEffect(() => {
     const fetchCredits = async () => {
       if (!connected || !wallet) return
@@ -64,7 +67,7 @@ export default function OpenCasePage() {
       } catch {}
     }
     fetchCredits()
-  }, [connected, wallet])
+  }, [connected, wallet, refreshTrigger])
 
   // Fetch user id on connect
   useEffect(() => {
@@ -134,7 +137,8 @@ export default function OpenCasePage() {
   }, [connected, wallet, caseData])
 
   const handleComplete = useCallback((result: any) => {
-    toast.success(`You won ${result?.name || 'a reward'}!`)
+    // Refresh balance after case opening - notification handled by component
+    setRefreshTrigger(prev => prev + 1)
   }, [])
 
   if (loading) {
@@ -148,24 +152,32 @@ export default function OpenCasePage() {
   if (!caseData) return null
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black" />
-      <div className="relative max-w-5xl mx-auto px-4 py-10">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white relative overflow-hidden">
+      <div className="relative max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-8">
           <button
-            className="text-sm text-gray-400 hover:text-white"
+            className="flex items-center space-x-2 text-orange-400 hover:text-orange-300 transition-colors font-medium"
             onClick={() => router.push('/')}
           >
-            ← Back
+            <span>←</span>
+            <span>Back to Cases</span>
           </button>
-          <div className="text-sm text-gray-400">{caseData.name} • {caseData.price} credits{userCredits !== null ? ` • Balance: ${userCredits}` : ''}</div>
+          <div className="bg-black/40 backdrop-blur-md rounded-xl px-4 py-2 border border-orange-500/30">
+            <div className="text-orange-300 font-medium">{caseData.name}</div>
+            <div className="text-sm text-gray-400">
+              Cost: {caseData.price} credits
+              {userCredits !== null ? ` • Balance: ${userCredits} credits` : ''}
+            </div>
+          </div>
         </div>
 
         {!connected ? (
-          <div className="max-w-md mx-auto">
-            <div className="bg-black/70 border border-gray-700 rounded-2xl p-6 text-center">
-              <div className="text-2xl font-bold mb-2">Connect Wallet</div>
-              <p className="text-gray-400 mb-4">Connect your Cardano wallet to open this case.</p>
+          <div className="max-w-lg mx-auto">
+            <div className="bg-black/40 backdrop-blur-md border border-orange-500/30 rounded-2xl p-8 text-center">
+              <div className="text-3xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
+                Connect Wallet
+              </div>
+              <p className="text-gray-300 mb-6">Connect your Cardano wallet to open this case.</p>
               <WalletSelector 
                 onWalletSelect={(key) => connect(key)} 
                 onError={(e) => toast.error(e)} 
@@ -174,20 +186,31 @@ export default function OpenCasePage() {
             </div>
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-black/60 rounded-2xl border border-gray-700 p-6 md:p-8"
-          >
-            <EnhancedCaseOpening
-              selectedCase={{ id: caseData.id, name: caseData.name, price: caseData.price, symbols: caseData.symbols || [] }}
-              wallet={wallet}
-              connected={connected}
-              userId={userId}
-              userCredits={userCredits ?? 0}
-              onCaseOpened={(reward) => handleComplete(reward as any)}
-            />
-          </motion.div>
+          <div className="flex flex-col items-center justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-4xl mx-auto"
+            >
+              <EnhancedCaseOpening
+                selectedCase={{ 
+                  id: caseData.id, 
+                  name: caseData.name, 
+                  price: caseData.price, 
+                  image_url: caseData.image_url,
+                  symbols: caseData.symbols || [] 
+                }}
+                wallet={wallet}
+                connected={connected}
+                userId={userId}
+                userCredits={userCredits ?? 0}
+                onCaseOpened={(reward) => {
+                  console.log('🎯 Case opened with reward:', reward)
+                  handleComplete(reward as any)
+                }}
+              />
+            </motion.div>
+          </div>
         )}
       </div>
     </div>

@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
               symbol: {
                 key: cs.symbols?.id,
                 name: cs.symbols?.name,
+                emoji: cs.symbols?.name?.charAt(0).toUpperCase() || 'S',
                 imageUrl: cs.symbols?.image_url || null,
                 rarity: cs.symbols?.rarity || 'common'
               }
