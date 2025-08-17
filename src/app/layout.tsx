@@ -33,10 +33,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={`${poppins.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
+        {/* Early theme application to avoid flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => { try { const t = localStorage.getItem('theme'); if (t) { document.documentElement.classList.toggle('dark', t === 'dark'); } else { document.documentElement.classList.add('dark'); } } catch {} })();`,
+          }}
+        />
         <MeshWalletProvider>
           {children}
         </MeshWalletProvider>
