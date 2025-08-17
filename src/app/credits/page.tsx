@@ -22,6 +22,7 @@ export default function CreditsPage() {
   const router = useRouter()
   const [userCredits, setUserCredits] = useState<UserCredits>({ credits: 0, loading: false })
   const [adaBalance, setAdaBalance] = useState<number>(0)
+  const [walletAddress, setWalletAddress] = useState<string>("")
 
   // Fetch user credits and ADA balance
   const fetchUserCredits = async () => {
@@ -32,6 +33,7 @@ export default function CreditsPage() {
     try {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
+      setWalletAddress(walletAddress)
       
       // Fetch credits
       const response = await fetch('/api/get-credits', {
@@ -222,7 +224,7 @@ export default function CreditsPage() {
               className="mb-12"
             >
               <CreditPacks
-                walletAddress="" 
+                walletAddress={walletAddress}
                 onPurchaseSuccess={handleCreditPurchaseSuccess}
                 onError={(error) => toast.error(error)}
                 onCreditsUpdated={handleCreditsUpdate}
