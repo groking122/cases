@@ -12,7 +12,7 @@ const nextConfig = {
     // Unblock production build despite ESLint errors (you can re-enable later)
     ignoreDuringBuilds: true,
   },
-  // Configure images for Supabase storage - Alternative JS config
+  // Configure images for Supabase storage
   images: {
     remotePatterns: [
       {
@@ -28,7 +28,6 @@ const nextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
-    domains: ['kavzamtcbepdjmmsjsuj.supabase.co'], // Legacy fallback
   },
   webpack: (config) => {
     // Ensure WASM files from cardano-serialization-lib-nodejs are handled in server build

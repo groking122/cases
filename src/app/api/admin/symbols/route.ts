@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
 
     const symbolData: any = {
       name,
+      symbol: name.toLowerCase().replace(/[^a-z0-9]/g, '_'), // Add symbol key based on name
       description: description || '',
       image_url: imageUrl,
       rarity,

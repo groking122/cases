@@ -23,7 +23,17 @@ interface Case {
   price: number;
   image_url?: string;
   description?: string;
-  symbols?: Array<{ symbolId: string; weight: number; symbol: { key: string; name: string; imageUrl: string | null; rarity: string } }>
+  symbols?: Array<{ 
+    symbolId: string; 
+    weight: number; 
+    symbol: { 
+      key: string; 
+      name: string; 
+      emoji?: string;
+      imageUrl: string | null; 
+      rarity: string 
+    } 
+  }>
 }
 
 interface EnhancedCaseOpeningProps {
@@ -35,49 +45,43 @@ interface EnhancedCaseOpeningProps {
   userCredits?: number;
 }
 
-// Rarity configurations
+// Rarity configurations - color-only display
 const RARITY_CONFIG = {
   common: {
     color: '#9CA3AF',
-    bgGradient: 'from-gray-400 to-gray-600',
-    glowColor: '#9CA3AF50',
-    emoji: '⚪',
-    label: 'Common'
+    bgGradient: 'from-gray-500 to-gray-600',
+    glowColor: '#9CA3AF80',
+    borderColor: '#6B7280'
   },
   uncommon: {
     color: '#10B981',
-    bgGradient: 'from-green-400 to-green-600',
-    glowColor: '#10B98150',
-    emoji: '🟢',
-    label: 'Uncommon'
+    bgGradient: 'from-green-500 to-emerald-600',
+    glowColor: '#10B98180',
+    borderColor: '#059669'
   },
   rare: {
     color: '#3B82F6',
-    bgGradient: 'from-blue-400 to-blue-600',
-    glowColor: '#3B82F650',
-    emoji: '🔵',
-    label: 'Rare'
+    bgGradient: 'from-blue-500 to-blue-600',
+    glowColor: '#3B82F680',
+    borderColor: '#2563EB'
   },
   epic: {
-    color: '#8B5CF6',
-    bgGradient: 'from-purple-400 to-purple-600',
-    glowColor: '#8B5CF650',
-    emoji: '🟣',
-    label: 'Epic'
+    color: '#EC4899',
+    bgGradient: 'from-pink-500 to-purple-500',
+    glowColor: '#EC489980',
+    borderColor: '#DB2777'
   },
   legendary: {
     color: '#F59E0B',
-    bgGradient: 'from-yellow-400 to-orange-500',
-    glowColor: '#F59E0B50',
-    emoji: '🟡',
-    label: 'Legendary'
+    bgGradient: 'from-orange-500 to-amber-500',
+    glowColor: '#F59E0B80',
+    borderColor: '#D97706'
   },
   mythic: {
     color: '#EF4444',
-    bgGradient: 'from-red-500 to-pink-600',
-    glowColor: '#EF444450',
-    emoji: '🔴',
-    label: 'Mythic'
+    bgGradient: 'from-red-500 to-rose-600',
+    glowColor: '#EF444480',
+    borderColor: '#DC2626'
   }
 };
 
@@ -198,7 +202,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
   const isDisabled = !selectedCase || !connected || isProcessing || (selectedCase && userCredits < selectedCase.price);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[300px] sm:min-h-[400px] p-6 bg-black/95 backdrop-blur-xl rounded-2xl border border-gray-800/30">
+    <div className="flex flex-col items-center justify-center min-h-[400px] sm:min-h-[500px] p-8 bg-gradient-to-br from-gray-900 via-black to-gray-800 backdrop-blur-md rounded-2xl border border-orange-500/50 shadow-2xl">
       <AnimatePresence mode="wait">
         {/* Case Display */}
         <motion.div
@@ -223,20 +227,23 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                   symbol: {
                     key: reward.id,
                     name: reward.name,
-                    emoji: '⭐',
+                    emoji: reward.name.charAt(0).toUpperCase(),
                     imageUrl: reward.image_url || null
                   },
                   rarity: reward.rarity,
                   isWinning: true
                 } : null}
                 seed={`case-${selectedCase?.id}-${userId || 'guest'}-${Date.now()}`}
-                fillerPool={(selectedCase?.symbols || []).map(s => ({
-                  key: s.symbol.key,
-                  name: s.symbol.name,
-                  emoji: '⭐',
-                  imageUrl: s.symbol.imageUrl || null,
-                  rarity: s.symbol.rarity
-                }))}
+                fillerPool={(selectedCase?.symbols || []).map(s => {
+                  console.log('🎨 Mapping symbol for filler pool:', s)
+                  return {
+                    key: s.symbol.key,
+                    name: s.symbol.name,
+                    emoji: s.symbol.emoji || s.symbol.name.charAt(0).toUpperCase(),
+                    imageUrl: s.symbol.imageUrl || null,
+                    rarity: s.symbol.rarity
+                  }
+                })}
                 onComplete={() => {
                   console.log('🎰 Reel animation completed, transitioning to revealing')
                   
@@ -258,14 +265,17 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                         // Play rarity-specific sound sequence
                         playCaseOpeningSequence(currentReward.rarity as Rarity);
                         
-                        // Show success toast with rarity info
+                        // Show success toast with clean styling
                         const rarityConfig = RARITY_CONFIG[currentReward.rarity as keyof typeof RARITY_CONFIG] || RARITY_CONFIG.common;
-                        toast.success(`🎉 ${rarityConfig.emoji} ${rarityConfig.label} Reward! +${currentReward.value} credits`, {
-                          duration: 8000, // Longer toast duration
+                        toast.success(`Reward Unlocked: ${currentReward.name} (+${currentReward.value} credits)`, {
+                          duration: 5000,
                           style: {
-                            background: `linear-gradient(135deg, ${rarityConfig.color}20, ${rarityConfig.color}10)`,
-                            border: `1px solid ${rarityConfig.color}`,
-                            color: rarityConfig.color
+                            background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(251, 146, 60, 0.8))',
+                            border: '1px solid #f97316',
+                            color: '#fff',
+                            fontWeight: '600',
+                            borderRadius: '12px',
+                            boxShadow: '0 10px 25px rgba(249, 115, 22, 0.3)'
                           }
                         });
 
@@ -295,17 +305,17 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
         </motion.div>
       </AnimatePresence>
 
-      {/* Enhanced Action Button with micro-interactions */}
-      <div className="w-full max-w-xs sm:max-w-sm">
+      {/* Action Button with orange theme */}
+      <div className="w-full max-w-md">
         <LoadingButton
           isLoading={isProcessing}
           loadingText={getLoadingText(stage)}
           onClick={handleOpenCase}
           disabled={isDisabled}
-          className={`w-full h-12 sm:h-14 text-base sm:text-lg font-bold transition-all duration-200 relative overflow-hidden ${
+          className={`w-full h-14 sm:h-16 text-lg sm:text-xl font-bold transition-all duration-300 relative overflow-hidden rounded-xl ${
             isDisabled 
-              ? 'bg-gray-600 text-gray-400 cursor-not-allowed' 
-              : 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 active:from-purple-800 active:to-pink-800 text-white shadow-lg hover:shadow-xl active:shadow-md transform hover:scale-105 active:scale-95 hover:-translate-y-0.5'
+              ? 'bg-gray-700 text-gray-400 cursor-not-allowed border-2 border-gray-600' 
+              : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white shadow-lg hover:shadow-xl border-2 border-orange-500/50 hover:border-orange-400 transform hover:scale-[1.02] active:scale-[0.98]'
           }`}
         >
           {/* Shimmer effect on hover */}
@@ -321,23 +331,23 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
           {/* Floating particles around button when active */}
           {!isDisabled && stage === 'idle' && (
             <div className="absolute inset-0">
-              {[...Array(3)].map((_, i) => (
+              {[...Array(4)].map((_, i) => (
                 <motion.div
                   key={i}
-                  className="absolute w-1 h-1 bg-white/40 rounded-full"
+                  className="absolute w-2 h-2 bg-orange-400/60 rounded-full"
                   style={{
-                    left: `${20 + i * 30}%`,
-                    top: '20%',
+                    left: `${15 + i * 20}%`,
+                    top: '25%',
                   }}
                   animate={{
-                    y: [0, -10, 0],
-                    opacity: [0.4, 0.8, 0.4],
-                    scale: [0.5, 1, 0.5]
+                    y: [0, -15, 0],
+                    opacity: [0.6, 1, 0.6],
+                    scale: [0.8, 1.2, 0.8]
                   }}
                   transition={{
-                    duration: 2,
+                    duration: 2.5,
                     repeat: Infinity,
-                    delay: i * 0.5,
+                    delay: i * 0.4,
                     ease: "easeInOut"
                   }}
                 />
@@ -368,22 +378,35 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
 // Case Display Component
 const CaseDisplay: React.FC<{ selectedCase: Case | null }> = ({ selectedCase }) => (
   <motion.div
-    className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center shadow-2xl"
-    whileHover={{ scale: 1.05 }}
+    className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-xl bg-gradient-to-br from-gray-800/80 to-black/80 border-2 border-orange-500/40 flex items-center justify-center shadow-xl overflow-hidden"
+    whileHover={{ scale: 1.05, borderColor: '#f97316' }}
     whileTap={{ scale: 0.95 }}
-    transition={{ duration: 0.2 }}
+    transition={{ duration: 0.3 }}
   >
-    <div className="text-center">
-      <div className="text-4xl sm:text-6xl mb-1 sm:mb-2">📦</div>
-      {selectedCase && (
-        <div className="text-white font-semibold text-xs sm:text-sm px-2">
-          {selectedCase.name}
+    {selectedCase?.image_url ? (
+      <motion.img
+        src={selectedCase.image_url}
+        alt={selectedCase.name}
+        className="w-full h-full object-cover rounded-lg"
+        initial={{ scale: 1 }}
+        whileHover={{ scale: 1.1 }}
+        transition={{ duration: 0.3 }}
+      />
+    ) : (
+      <div className="text-center">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 bg-gradient-to-br from-orange-600/40 to-orange-800/60 rounded-lg border border-orange-500/50 flex items-center justify-center">
+          <div className="text-2xl sm:text-3xl">📦</div>
         </div>
-      )}
-    </div>
+        {selectedCase && (
+          <div className="text-white font-semibold text-sm sm:text-base px-2">
+            {selectedCase.name}
+          </div>
+        )}
+      </div>
+    )}
     <motion.div
-      className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20"
-      animate={{ opacity: [0.5, 0.8, 0.5] }}
+      className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/20 to-orange-600/20"
+      animate={{ opacity: [0.3, 0.6, 0.3] }}
       transition={{ duration: 2, repeat: Infinity }}
     />
   </motion.div>
@@ -392,11 +415,11 @@ const CaseDisplay: React.FC<{ selectedCase: Case | null }> = ({ selectedCase }) 
 // Shaking Case Component
 const ShakingCase: React.FC<{ selectedCase: Case | null }> = ({ selectedCase }) => (
   <motion.div
-    className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-lg bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 flex items-center justify-center shadow-2xl"
+    className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-xl bg-gradient-to-br from-gray-800/80 to-black/80 border-2 border-orange-400 flex items-center justify-center shadow-xl overflow-hidden"
     animate={{
-      x: [0, -2, 2, -2, 2, 0],
-      y: [0, -1, 1, -1, 1, 0],
-      rotate: [0, -0.5, 0.5, -0.5, 0.5, 0]
+      x: [0, -3, 3, -3, 3, 0],
+      y: [0, -2, 2, -2, 2, 0],
+      rotate: [0, -1, 1, -1, 1, 0]
     }}
     transition={{
       duration: 0.3,
@@ -404,18 +427,30 @@ const ShakingCase: React.FC<{ selectedCase: Case | null }> = ({ selectedCase }) 
       repeatType: "loop"
     }}
   >
-    <div className="text-center">
-      <div className="text-4xl sm:text-6xl mb-1 sm:mb-2">📦</div>
-      {selectedCase && (
-        <div className="text-white font-semibold text-xs sm:text-sm px-2">
-          {selectedCase.name}
+    {selectedCase?.image_url ? (
+      <motion.img
+        src={selectedCase.image_url}
+        alt={selectedCase.name}
+        className="w-full h-full object-cover rounded-lg"
+        animate={{ scale: [1, 1.05, 1] }}
+        transition={{ duration: 0.5, repeat: Infinity }}
+      />
+    ) : (
+      <div className="text-center">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 bg-gradient-to-br from-orange-600/40 to-orange-800/60 rounded-lg border border-orange-500/50 flex items-center justify-center">
+          <div className="text-2xl sm:text-3xl">📦</div>
         </div>
-      )}
-    </div>
+        {selectedCase && (
+          <div className="text-white font-semibold text-sm sm:text-base px-2">
+            {selectedCase.name}
+          </div>
+        )}
+      </div>
+    )}
     <motion.div
-      className="absolute inset-0 rounded-lg bg-gradient-to-r from-yellow-500/30 to-orange-500/30"
-      animate={{ opacity: [0.3, 0.7, 0.3] }}
-      transition={{ duration: 0.5, repeat: Infinity }}
+      className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500/40 to-orange-600/40"
+      animate={{ opacity: [0.3, 0.8, 0.3] }}
+      transition={{ duration: 0.4, repeat: Infinity }}
     />
   </motion.div>
 );
@@ -423,28 +458,31 @@ const ShakingCase: React.FC<{ selectedCase: Case | null }> = ({ selectedCase }) 
 // Opening Case Component
 const OpeningCase: React.FC<{ selectedCase: Case | null }> = ({ selectedCase }) => (
   <motion.div
-    className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-lg flex items-center justify-center"
+    className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-xl flex items-center justify-center overflow-hidden"
     initial={{ scale: 1 }}
-    animate={{ scale: [1, 1.2, 1] }}
-    transition={{ duration: 1.5, repeat: Infinity }}
+    animate={{ scale: [1, 1.1, 1] }}
+    transition={{ duration: 1.2, repeat: Infinity }}
   >
     <motion.div
-      className="absolute inset-0 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500"
+      className="absolute inset-0 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600"
       animate={{
-        opacity: [0.3, 0.8, 0.3],
-        scale: [1, 1.1, 1]
+        opacity: [0.4, 0.9, 0.4],
+        scale: [1, 1.05, 1]
       }}
       transition={{ duration: 0.8, repeat: Infinity }}
     />
     <div className="relative text-center text-white z-10">
       <motion.div
-        className="text-4xl sm:text-6xl mb-1 sm:mb-2"
+        className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4 rounded-full border-4 border-orange-300/50 bg-gradient-to-br from-orange-600/40 to-orange-800/60 flex items-center justify-center"
         animate={{ rotate: [0, 180, 360] }}
         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        style={{
+          boxShadow: '0 0 30px rgba(249, 115, 22, 0.5)'
+        }}
       >
-        ✨
+        <div className="text-2xl sm:text-3xl">⚡</div>
       </motion.div>
-      <div className="font-semibold text-xs sm:text-sm">Opening...</div>
+      <div className="font-bold text-sm sm:text-base text-orange-100">Opening...</div>
     </div>
   </motion.div>
 );
@@ -457,11 +495,10 @@ const RewardReveal: React.FC<{ reward: Reward | null; stage: OpeningStage; isMob
 
   return (
     <motion.div
-      className="relative w-32 h-32 sm:w-48 sm:h-48 rounded-lg flex items-center justify-center overflow-hidden"
+      className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-2xl flex items-center justify-center overflow-hidden bg-gradient-to-br from-gray-800/90 to-black/90"
       style={{
-        background: `linear-gradient(135deg, ${rarityConfig.color}20, ${rarityConfig.color}40)`,
-        border: `2px solid ${rarityConfig.color}`,
-        boxShadow: `0 0 20px ${rarityConfig.glowColor}, 0 0 40px ${rarityConfig.glowColor}50`
+        border: `3px solid ${rarityConfig.color}`,
+        boxShadow: `0 0 30px ${rarityConfig.glowColor}, 0 0 60px ${rarityConfig.glowColor}`
       }}
       initial={{ scale: 0.5, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
@@ -471,133 +508,126 @@ const RewardReveal: React.FC<{ reward: Reward | null; stage: OpeningStage; isMob
       <motion.div
         className="absolute inset-0"
         style={{
-          background: `radial-gradient(circle, ${rarityConfig.color}30 0%, transparent 70%)`
+          background: `radial-gradient(circle, ${rarityConfig.color}20 0%, transparent 70%)`
         }}
         animate={stage === 'celebration' ? {
-          scale: [1, 1.5, 1],
-          opacity: [0.5, 0.8, 0.5]
+          scale: [1, 1.3, 1],
+          opacity: [0.6, 0.9, 0.6]
         } : {}}
         transition={{ duration: 1, repeat: Infinity }}
       />
 
       {/* Reward Content */}
-      <div className="relative text-center z-10 px-2">
+      <div className="relative text-center z-10 px-4">
+        {/* Symbol Image Container */}
         <motion.div
-          className="text-3xl sm:text-5xl mb-1 sm:mb-2"
+          className="mb-6"
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.3, duration: 0.5, ease: "backOut" }}
         >
-          {rarityConfig.emoji}
+          <div className="w-32 h-32 sm:w-40 sm:h-40 mx-auto rounded-2xl border-3 overflow-hidden" style={{ 
+            borderColor: rarityConfig.color,
+            backgroundColor: `${rarityConfig.color}10`
+          }}>
+            {reward.image_url ? (
+              <img 
+                src={reward.image_url} 
+                alt={reward.name}
+                className="w-full h-full object-contain p-2"
+                style={{ 
+                  filter: `drop-shadow(0 0 10px ${rarityConfig.glowColor})`
+                }}
+              />
+            ) : (
+              <div 
+                className="w-full h-full flex items-center justify-center text-4xl sm:text-5xl font-bold"
+                style={{ 
+                  background: `linear-gradient(135deg, ${rarityConfig.color}40, ${rarityConfig.color}60)`,
+                  color: '#ffffff'
+                }}
+              >
+                {reward.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
         </motion.div>
+        
         <motion.div
-          className="text-white font-bold text-xs sm:text-sm mb-1 leading-tight"
+          className="text-white font-bold text-xl sm:text-2xl mb-3 leading-tight"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.5 }}
         >
           {reward.name}
         </motion.div>
+        
         <motion.div
-          className="text-xs sm:text-xs opacity-80 leading-tight"
-          style={{ color: rarityConfig.color }}
+          className="w-16 h-4 mx-auto rounded-full mb-3"
+          style={{ 
+            background: `linear-gradient(to right, ${rarityConfig.color}, ${rarityConfig.borderColor})`,
+            boxShadow: `0 0 15px ${rarityConfig.glowColor}`
+          }}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        />
+        
+        <motion.div
+          className="text-orange-200 font-semibold text-base sm:text-lg"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7, duration: 0.5 }}
         >
-          {rarityConfig.label} • {reward.value} Credits
+          +{reward.value} Credits
         </motion.div>
       </div>
 
-      {/* Enhanced Celebration Particles with rarity-based intensity */}
+      {/* Simple Celebration Effects */}
       {stage === 'celebration' && (
         <div className="absolute inset-0">
-          {/* Base particles for all rarities */}
-          {[...Array(isMobile ? 4 : 6)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 rounded-full"
-              style={{ backgroundColor: rarityConfig.color }}
-              initial={{
-                x: '50%',
-                y: '50%',
-                scale: 0
-              }}
-              animate={{
-                x: `${50 + (Math.cos(i * Math.PI / 3) * 80)}%`,
-                y: `${50 + (Math.sin(i * Math.PI / 3) * 80)}%`,
-                scale: [0, 1, 0]
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                delay: i * 0.1
-              }}
-            />
-          ))}
-
-          {/* Epic+ rarity: Add sparkle ring */}
-          {['epic', 'legendary', 'mythic'].includes(reward?.rarity || '') && (
-            <motion.div
-              className="absolute inset-0 border-2 rounded-full"
-              style={{ borderColor: `${rarityConfig.color}60` }}
-              animate={{
-                scale: [1, 1.3, 1],
-                rotate: [0, 360],
-                opacity: [0.3, 0.8, 0.3]
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            />
-          )}
-
-          {/* Legendary+ rarity: Add golden sparkles */}
-          {['legendary', 'mythic'].includes(reward?.rarity || '') && (
+          {/* Subtle glow effect */}
+          <motion.div
+            className="absolute inset-0 rounded-2xl"
+            style={{
+              background: `radial-gradient(circle, ${rarityConfig.color}40 0%, transparent 60%)`,
+              border: `2px solid ${rarityConfig.color}`
+            }}
+            animate={{
+              opacity: [0.3, 0.8, 0.3],
+              scale: [1, 1.05, 1]
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+          
+          {/* Corner sparkles for higher rarities */}
+          {['rare', 'epic', 'legendary', 'mythic'].includes(reward?.rarity || '') && (
             <>
-              {[...Array(8)].map((_, i) => (
+              {[...Array(4)].map((_, i) => (
                 <motion.div
-                  key={`sparkle-${i}`}
-                  className="absolute w-2 h-2"
+                  key={`corner-${i}`}
+                  className="absolute w-2 h-2 rounded-full"
                   style={{
-                    left: '50%',
-                    top: '50%',
-                    background: `linear-gradient(45deg, ${rarityConfig.color}, #FFD700)`
+                    backgroundColor: rarityConfig.color,
+                    left: i % 2 === 0 ? '10%' : '90%',
+                    top: i < 2 ? '10%' : '90%'
                   }}
                   animate={{
-                    x: Math.cos(i * Math.PI / 4) * 120,
-                    y: Math.sin(i * Math.PI / 4) * 120,
-                    rotate: [0, 360],
                     scale: [0, 1.5, 0],
                     opacity: [0, 1, 0]
                   }}
                   transition={{
-                    duration: 2.5,
+                    duration: 2,
                     repeat: Infinity,
-                    delay: i * 0.2,
-                    ease: "easeOut"
+                    delay: i * 0.3
                   }}
                 />
               ))}
             </>
-          )}
-
-          {/* Mythic rarity: Screen flash effect */}
-          {reward?.rarity === 'mythic' && (
-            <motion.div
-              className="absolute -inset-10 bg-gradient-radial from-white/20 to-transparent"
-              animate={{
-                scale: [0, 3, 0],
-                opacity: [0, 0.4, 0]
-              }}
-              transition={{
-                duration: 0.8,
-                repeat: 3,
-                repeatDelay: 0.5
-              }}
-            />
           )}
         </div>
       )}

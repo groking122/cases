@@ -50,15 +50,17 @@ export function SpinningReelCarousel({
 
   const generateReelItems = useCallback(() => {
     console.log('🎰 Generating reel items...')
+    console.log('🎰 FillerPool received:', fillerPool)
     
     try {
       // Build symbol pool from fillerPool or minimal fallback
       const pool = (fillerPool && fillerPool.length > 0) ? fillerPool : [
-        { key: 'coin', name: 'Coin', emoji: '🪙', rarity: 'common', imageUrl: null },
-        { key: 'diamond', name: 'Diamond', emoji: '💎', rarity: 'rare', imageUrl: null },
-        { key: 'crown', name: 'Crown', emoji: '👑', rarity: 'rare', imageUrl: null },
+        { key: 'coin', name: 'Coin', emoji: 'C', rarity: 'common', imageUrl: null },
+        { key: 'diamond', name: 'Diamond', emoji: 'D', rarity: 'rare', imageUrl: null },
+        { key: 'crown', name: 'Crown', emoji: 'R', rarity: 'rare', imageUrl: null },
       ]
       console.log('🎰 Using pool size:', pool.length)
+      console.log('🎰 Pool contents:', pool)
       
       // Reduce reel length to prevent disappearing symbols
       const reelLength = Math.min(24, Math.max(16, pool.length * 3))
@@ -113,11 +115,11 @@ export function SpinningReelCarousel({
       console.error('❌ Error generating reel items:', error)
       // Return fallback items on error
       return [
-        { id: 'fallback-1', symbol: { key: 'coin', name: 'Fallback Coin', emoji: '🪙' }, rarity: 'common', isWinning: false },
-        { id: 'fallback-2', symbol: { key: 'diamond', name: 'Fallback Diamond', emoji: '💎' }, rarity: 'rare', isWinning: false }
+        { id: 'fallback-1', symbol: { key: 'coin', name: 'Fallback Coin', emoji: 'C' }, rarity: 'common', isWinning: false },
+        { id: 'fallback-2', symbol: { key: 'diamond', name: 'Fallback Diamond', emoji: 'D' }, rarity: 'rare', isWinning: false }
       ]
     }
-  }, [winningItem])
+  }, [winningItem, fillerPool, seededRandom])
 
   // Update reel items when component mounts or winning item changes
   useEffect(() => {
@@ -231,12 +233,21 @@ export function SpinningReelCarousel({
 
   console.log('🎰 Render check - isSpinning:', isSpinning, 'itemsLength:', reelItems.current.length, 'animationState:', animationState)
   
+  // Debug logging for troubleshooting
+  console.log('🎰 Render check:', {
+    isSpinning,
+    itemsLength: reelItems.current.length,
+    animationState,
+    fillerPoolLength: fillerPool.length,
+    winningItem: winningItem ? `${winningItem.symbol?.name}` : 'none'
+  })
+
   // Always render something, but show different states
   if (reelItems.current.length === 0) {
-    console.log('🎰 No items to display')
+    console.log('🎰 No items to display - fillerPool:', fillerPool)
     return (
       <div className="w-full h-56 bg-red-500/20 rounded-xl flex items-center justify-center">
-        <div className="text-white text-lg">No items to display</div>
+        <div className="text-white text-lg">No items to display (Pool: {fillerPool.length})</div>
       </div>
     )
   }
@@ -253,16 +264,13 @@ export function SpinningReelCarousel({
   console.log('🎰 Rendering carousel with', reelItems.current.length, 'items')
 
   return (
-    <div className="relative w-full h-56 overflow-hidden bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-2xl border-4 border-yellow-400/60 shadow-2xl">
+    <div className="relative w-full h-64 overflow-hidden bg-gradient-to-r from-gray-900/80 via-black to-gray-800/80 rounded-2xl border-4 border-orange-500/60 shadow-2xl">
       
-      {/* Center line indicator - more prominent */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3 h-full bg-gradient-to-b from-yellow-400 via-white to-yellow-400 z-30 shadow-[0_0_30px_rgba(255,255,200,0.8)] blur-[1px] rounded-full" />
+      {/* Center line indicator - orange theme */}
+      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3 h-full bg-gradient-to-b from-orange-400 via-white to-orange-400 z-30 shadow-[0_0_30px_rgba(249,115,22,0.8)] blur-[1px] rounded-full" />
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-[2px] h-full bg-white/90 z-40" />
       
-      {/* Debug info */}
-      <div className="absolute top-2 left-2 z-50 text-white text-xs bg-black/50 p-2 rounded">
-        State: {animationState} | Items: {reelItems.current.length} | Winning: {winningPosition}
-      </div>
+
 
       {/* Reel container */}
       <motion.div
@@ -397,7 +405,7 @@ export function SpinningReelCarousel({
                     symbol={{
                       id: (item.symbol as any).key || item.id,
                       name: item.symbol.name,
-                      emoji: item.symbol.emoji,
+                      emoji: item.symbol.emoji || 'S',
                       imageUrl: item.symbol.imageUrl || null,
                       rarity: item.rarity
                     }}
@@ -452,30 +460,32 @@ export function SpinningReelCarousel({
           {/* Main celebration banner */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             <motion.div 
-              className="bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600 text-black px-8 py-4 rounded-2xl font-bold text-xl shadow-2xl border-4 border-yellow-300"
+              className="bg-gradient-to-r from-orange-500 via-orange-600 to-orange-500 text-white px-12 py-6 rounded-3xl font-bold text-2xl shadow-2xl border-4 border-orange-400"
               animate={{
-                scale: [1, 1.1, 1],
-                rotate: [0, 2, -2, 0],
+                scale: [1, 1.05, 1],
                 boxShadow: [
-                  '0 0 30px rgba(255,215,0,0.6)',
-                  '0 0 60px rgba(255,215,0,0.9)',
-                  '0 0 30px rgba(255,215,0,0.6)'
+                  '0 0 30px rgba(249,115,22,0.6)',
+                  '0 0 50px rgba(249,115,22,0.8)',
+                  '0 0 30px rgba(249,115,22,0.6)'
                 ]
               }}
               transition={{
-                duration: 1.5,
+                duration: 2,
                 repeat: Infinity,
                 ease: "easeInOut"
               }}
             >
-              🎊 WINNER! 🎊
+              REWARD UNLOCKED!
             </motion.div>
           </div>
           
-          {/* Celebration particles */}
+          {/* Celebration effects */}
           <div className="absolute top-4 left-4">
             <motion.div 
-              className="text-2xl"
+              className="w-12 h-12 bg-gradient-to-r from-orange-400 to-yellow-500 rounded-full border-2 border-orange-300"
+              style={{
+                boxShadow: '0 0 20px rgba(245, 158, 11, 0.6)'
+              }}
               animate={{
                 y: [0, -20, 0],
                 x: [0, 5, 0],
@@ -486,27 +496,7 @@ export function SpinningReelCarousel({
                 repeat: Infinity,
                 delay: 0.2
               }}
-            >
-              ✨
-            </motion.div>
-          </div>
-          
-          <div className="absolute top-4 right-4">
-            <motion.div 
-              className="text-2xl"
-              animate={{
-                y: [0, -20, 0],
-                x: [0, -5, 0],
-                opacity: [1, 0.5, 1]
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                delay: 0.6
-              }}
-            >
-              🎉
-            </motion.div>
+            />
           </div>
         </div>
       )}
@@ -521,30 +511,31 @@ export function SpinningReelCarousel({
               onComplete()
             }}
             onMouseEnter={() => casinoSoundManager.playSound('hover')}
-            className="bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 text-white px-8 py-4 rounded-full font-bold text-lg shadow-2xl cursor-pointer transform transition-all duration-200 hover:scale-110 active:scale-95"
+            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-2xl cursor-pointer transform transition-all duration-300 border-2 border-orange-400/50"
             animate={{
-              scale: [1, 1.05, 1],
-              opacity: [0.9, 1, 0.9],
+              scale: [1, 1.03, 1],
+              opacity: [0.95, 1, 0.95],
               boxShadow: [
-                '0 4px 20px rgba(34, 197, 94, 0.4)',
-                '0 8px 30px rgba(34, 197, 94, 0.6)',
-                '0 4px 20px rgba(34, 197, 94, 0.4)'
+                '0 8px 25px rgba(249, 115, 22, 0.4)',
+                '0 12px 35px rgba(249, 115, 22, 0.6)',
+                '0 8px 25px rgba(249, 115, 22, 0.4)'
               ]
             }}
             transition={{
-              duration: 2,
+              duration: 2.5,
               repeat: Infinity,
               ease: "easeInOut"
             }}
             whileHover={{
-              scale: 1.1,
-              boxShadow: '0 10px 40px rgba(34, 197, 94, 0.8)'
+              scale: 1.08,
+              boxShadow: '0 15px 45px rgba(249, 115, 22, 0.8)',
+              borderColor: '#f97316'
             }}
             whileTap={{
-              scale: 0.95
+              scale: 0.98
             }}
           >
-            🏆 CLAIM YOUR REWARD! 🏆
+            CLAIM REWARD
           </motion.button>
         </div>
       )}

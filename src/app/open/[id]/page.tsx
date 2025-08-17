@@ -13,6 +13,7 @@ export default function OpenCasePage() {
   const router = useRouter()
   const { connected, wallet, connect, connecting } = useWallet()
   const [userCredits, setUserCredits] = useState<number | null>(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const [caseData, setCaseData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
@@ -31,6 +32,8 @@ export default function OpenCasePage() {
             router.push('/')
             return
           }
+          console.log('🎮 Case data loaded:', found)
+          console.log('🎯 Case symbols:', found.symbols)
            setCaseData(found)
         } else {
           toast.error('Failed to load case')
@@ -47,7 +50,7 @@ export default function OpenCasePage() {
     load()
   }, [params.id, router])
 
-  // Fetch credits when connected
+  // Fetch credits when connected or after case opening (refreshTrigger)
   useEffect(() => {
     const fetchCredits = async () => {
       if (!connected || !wallet) return
@@ -64,7 +67,7 @@ export default function OpenCasePage() {
       } catch {}
     }
     fetchCredits()
-  }, [connected, wallet])
+  }, [connected, wallet, refreshTrigger])
 
   // Fetch user id on connect
   useEffect(() => {
@@ -134,7 +137,8 @@ export default function OpenCasePage() {
   }, [connected, wallet, caseData])
 
   const handleComplete = useCallback((result: any) => {
-    toast.success(`You won ${result?.name || 'a reward'}!`)
+    // Refresh balance after case opening - notification handled by component
+    setRefreshTrigger(prev => prev + 1)
   }, [])
 
   if (loading) {
@@ -180,12 +184,21 @@ export default function OpenCasePage() {
             className="bg-black/60 rounded-2xl border border-gray-700 p-6 md:p-8"
           >
             <EnhancedCaseOpening
-              selectedCase={{ id: caseData.id, name: caseData.name, price: caseData.price, symbols: caseData.symbols || [] }}
-              wallet={wallet}
-              connected={connected}
-              userId={userId}
-              userCredits={userCredits ?? 0}
-              onCaseOpened={(reward) => handleComplete(reward as any)}
+                              selectedCase={{ 
+                  id: caseData.id, 
+                  name: caseData.name, 
+                  price: caseData.price, 
+                  image_url: caseData.image_url,
+                  symbols: caseData.symbols || [] 
+                }}
+                wallet={wallet}
+                connected={connected}
+                userId={userId}
+                userCredits={userCredits ?? 0}
+                onCaseOpened={(reward) => {
+                  console.log('🎯 Case opened with reward:', reward)
+                  handleComplete(reward as any)
+                }}
             />
           </motion.div>
         )}
