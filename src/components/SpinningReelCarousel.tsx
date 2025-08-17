@@ -30,8 +30,10 @@ export function SpinningReelCarousel({
   
   const [animationState, setAnimationState] = useState<'idle' | 'anticipation' | 'nearMiss' | 'resolution' | 'revealHold' | 'celebration' | 'sustain'>('idle')
   const hasCompletedRef = useRef(false)
-  const itemWidth = 120
-  const visibleItems = 7
+  // Responsive sizing for mobile
+  const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : false
+  const itemWidth = isMobile ? 88 : 120
+  const visibleItems = isMobile ? 5 : 7
   const { canUseComplexEffects } = useDeviceCapabilities()
   
   // Create comprehensive reel with all symbols
@@ -246,7 +248,7 @@ export function SpinningReelCarousel({
   if (reelItems.current.length === 0) {
     console.log('🎰 No items to display - fillerPool:', fillerPool)
     return (
-      <div className="w-full h-56 bg-red-500/20 rounded-xl flex items-center justify-center">
+      <div className="w-full h-48 sm:h-56 bg-red-500/20 rounded-xl flex items-center justify-center">
         <div className="text-white text-lg">No items to display (Pool: {fillerPool.length})</div>
       </div>
     )
@@ -255,7 +257,7 @@ export function SpinningReelCarousel({
   if (!isSpinning) {
     console.log('🎰 Not spinning - showing ready state')
     return (
-      <div className="w-full h-56 bg-blue-500/20 rounded-xl flex items-center justify-center">
+      <div className="w-full h-48 sm:h-56 bg-blue-500/20 rounded-xl flex items-center justify-center">
         <div className="text-white text-lg">Ready to spin! ({reelItems.current.length} items loaded)</div>
       </div>
     )
@@ -264,7 +266,7 @@ export function SpinningReelCarousel({
   console.log('🎰 Rendering carousel with', reelItems.current.length, 'items')
 
   return (
-    <div className="relative w-full h-64 overflow-hidden bg-gradient-to-r from-gray-900/80 via-black to-gray-800/80 rounded-2xl border-4 border-orange-500/60 shadow-2xl">
+    <div className="relative w-full h-52 sm:h-64 overflow-hidden bg-gradient-to-r from-gray-900/80 via-black to-gray-800/80 rounded-2xl border-4 border-orange-500/60 shadow-2xl">
       
       {/* Center line indicator - orange theme */}
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3 h-full bg-gradient-to-b from-orange-400 via-white to-orange-400 z-30 shadow-[0_0_30px_rgba(249,115,22,0.8)] blur-[1px] rounded-full" />
@@ -274,7 +276,7 @@ export function SpinningReelCarousel({
 
       {/* Reel container */}
       <motion.div
-        className="flex items-center h-full py-6"
+        className="flex items-center h-full py-4 sm:py-6"
         initial={{ x: 0 }}
         animate={{
           x: animationState === 'anticipation' 
@@ -343,7 +345,7 @@ export function SpinningReelCarousel({
               }`}
               style={{ 
                 width: itemWidth - 8, 
-                height: 180
+                height: isMobile ? 140 : 180
               }}
               whileHover={{ rotateX: 6, rotateY: 6, scale: 1.03 }}
               animate={
@@ -409,7 +411,7 @@ export function SpinningReelCarousel({
                       imageUrl: item.symbol.imageUrl || null,
                       rarity: item.rarity
                     }}
-                    size={64}
+                    size={isMobile ? 52 : 64}
                   />
                   {/* Glass reflection overlay */}
                   {canUseComplexEffects && (

@@ -90,6 +90,7 @@ export default function Home() {
 
   // Credits popup state
   const [showCreditsPopup, setShowCreditsPopup] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
 
 
@@ -475,9 +476,9 @@ export default function Home() {
       <motion.header 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="border-b border-gray-800/50 bg-black/50 backdrop-blur-md"
+        className="border-b border-gray-800/50 bg-black/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50"
       >
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between relative">
           {/* Logo */}
           <motion.div 
             className="flex items-center gap-3"
@@ -493,7 +494,7 @@ export default function Home() {
             <span className="text-xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">FudCoin</span>
           </motion.div>
 
-          {/* Navigation Links - Centered */}
+          {/* Navigation Links - Centered (desktop) */}
           <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
             <motion.a 
               href="#cases" 
@@ -514,7 +515,7 @@ export default function Home() {
             </motion.a>
           </nav>
 
-          {/* Right side - Add Credits, Connected Status, Wallet Balance */}
+          {/* Right side - Add Credits, Connected Status, Wallet Balance (desktop) */}
           <div className="hidden md:flex items-center gap-3">
             <motion.button
               onClick={handleInstantPurchaseOpen}
@@ -554,18 +555,49 @@ export default function Home() {
             </motion.div>
           </div>
 
-          {/* Mobile Wallet Balance */}
-          <div className="md:hidden">
-            <WalletBalance
-              connected={connected}
-              credits={userCredits.credits}
-              cardanoBalance={adaBalance}
-              forceRefresh={refreshTrigger}
-              onCreditsChange={(credits) => setUserCredits(prev => ({ ...prev, credits }))}
-            />
+          {/* Mobile actions */}
+          <div className="md:hidden flex items-center gap-2">
+            {connected && (
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-400" aria-label="Connected" />
+            )}
+            <button
+              onClick={handleInstantPurchaseOpen}
+              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-gradient-to-r from-orange-600 to-red-600 text-white border border-orange-500/30"
+            >
+              Buy
+            </button>
+            <button
+              onClick={() => setMobileMenuOpen(v => !v)}
+              aria-label="Menu"
+              className="p-2 rounded-lg border border-gray-700 text-gray-200"
+            >
+              ☰
+            </button>
+            {mobileMenuOpen && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-black/90 border border-gray-800 rounded-xl p-3 shadow-2xl">
+                <div className="flex flex-col gap-2">
+                  <a href="#cases" className="px-2 py-2 rounded-md text-sm text-gray-200 hover:bg-white/5">Cases</a>
+                  <Link href="/inventory" className="px-2 py-2 rounded-md text-sm text-gray-200 hover:bg-white/5">Stash</Link>
+                  <a href="#rules" className="px-2 py-2 rounded-md text-sm text-gray-200 hover:bg-white/5">Rules</a>
+                  <div className="border-t border-gray-800 my-2" />
+                  <div className="px-1">
+                    <WalletBalance
+                      connected={connected}
+                      credits={userCredits.credits}
+                      cardanoBalance={adaBalance}
+                      forceRefresh={refreshTrigger}
+                      onCreditsChange={(credits) => setUserCredits(prev => ({ ...prev, credits }))}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </motion.header>
+
+      {/* Spacer to offset fixed header height */}
+      <div className="h-14 sm:h-16" />
 
       {/* Hero Section with Graffiti Case */}
       <motion.section 

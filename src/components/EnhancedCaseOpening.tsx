@@ -202,12 +202,12 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
   const isDisabled = !selectedCase || !connected || isProcessing || (selectedCase && userCredits < selectedCase.price);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] sm:min-h-[500px] p-8 bg-gradient-to-br from-gray-900 via-black to-gray-800 backdrop-blur-md rounded-2xl border border-orange-500/50 shadow-2xl">
+    <div className="flex flex-col items-center justify-center min-h-[360px] sm:min-h-[500px] p-4 sm:p-8 bg-gradient-to-br from-gray-900 via-black to-gray-800 backdrop-blur-md rounded-2xl border border-orange-500/50 shadow-2xl">
       <AnimatePresence mode="wait">
         {/* Case Display */}
         <motion.div
           key={stage}
-          className="relative mb-6 sm:mb-8"
+          className="relative mb-4 sm:mb-8"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.8, opacity: 0 }}
@@ -220,7 +220,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
           ) : stage === 'opening' ? (
             <OpeningCase selectedCase={selectedCase} />
           ) : stage === 'spinning' ? (
-            <div className="w-full max-w-4xl mx-auto">
+            <div className="w-full max-w-md sm:max-w-4xl mx-auto">
               <SpinningReelCarousel 
                 isSpinning={true}
                 winningItem={reward ? {
@@ -306,13 +306,13 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
       </AnimatePresence>
 
       {/* Action Button with orange theme */}
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-sm sm:max-w-md">
         <LoadingButton
           isLoading={isProcessing}
           loadingText={getLoadingText(stage)}
           onClick={handleOpenCase}
           disabled={isDisabled}
-          className={`w-full h-14 sm:h-16 text-lg sm:text-xl font-bold transition-all duration-300 relative overflow-hidden rounded-xl ${
+          className={`w-full h-12 sm:h-16 text-base sm:text-xl font-bold transition-all duration-300 relative overflow-hidden rounded-xl ${
             isDisabled 
               ? 'bg-gray-700 text-gray-400 cursor-not-allowed border-2 border-gray-600' 
               : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white shadow-lg hover:shadow-xl border-2 border-orange-500/50 hover:border-orange-400 transform hover:scale-[1.02] active:scale-[0.98]'
