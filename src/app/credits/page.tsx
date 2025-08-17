@@ -9,6 +9,7 @@ import toast from 'react-hot-toast'
 import WalletBalance from "@/components/WalletBalance"
 import CreditPacks from "@/components/CreditPacks"
 import WalletSelector from "@/components/WalletSelector"
+import ThemeToggle from "@/components/ThemeToggle"
 
 interface UserCredits {
   credits: number
@@ -101,16 +102,16 @@ export default function CreditsPage() {
   }, [connected, wallet])
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Solid Black Background */}
-      <div className="absolute inset-0 bg-black"></div>
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+      {/* Solid Background */}
+      <div className="absolute inset-0 bg-background"></div>
       
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         {Array.from({ length: 3 }).map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-64 h-64 bg-gradient-to-r from-red-600/5 to-orange-600/5 rounded-full blur-3xl"
+            className="absolute w-64 h-64 bg-gradient-to-r from-red-600/10 to-orange-600/10 rounded-full blur-3xl"
             style={{
               left: `${20 + i * 30}%`,
               top: `${20 + i * 20}%`,
@@ -144,7 +145,8 @@ export default function CreditsPage() {
               ← Back to Cases
             </Button>
             
-            <div className="min-w-[380px]">
+            <div className="flex items-center gap-3 min-w-[380px] justify-end">
+              <ThemeToggle />
               <WalletBalance 
                 connected={connected}
                 credits={userCredits.credits}
@@ -163,7 +165,7 @@ export default function CreditsPage() {
             <h1 className="text-3xl font-bold mb-4 bg-gradient-to-r from-red-400 via-orange-400 to-yellow-400 bg-clip-text text-transparent">
               Purchase Credits
             </h1>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-foreground/70 text-lg max-w-2xl mx-auto">
               Buy credits to open cases and discover amazing rewards. All payments are secure and processed on the blockchain.
             </p>
           </motion.div>
@@ -179,10 +181,10 @@ export default function CreditsPage() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <div className="bg-black/80 backdrop-blur-md rounded-3xl p-12 border border-gray-700 max-w-md mx-auto">
+            <div className="bg-card/80 backdrop-blur-md rounded-3xl p-12 border border-border max-w-md mx-auto">
               <div className="text-4xl mb-6 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent font-bold">WALLET</div>
-              <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
-              <p className="text-gray-400 mb-8">
+              <h2 className="text-2xl font-bold mb-4 text-foreground">Connect Your Wallet</h2>
+              <p className="text-foreground/70 mb-8">
                 Connect your Cardano wallet to purchase credits and start opening cases.
               </p>
               <WalletSelector
@@ -202,15 +204,15 @@ export default function CreditsPage() {
               transition={{ delay: 0.2 }}
             >
               <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-300 mb-2">Your Current Balance</h3>
+                <h3 className="text-lg font-medium text-foreground/80 mb-2">Your Current Balance</h3>
                 <div className="text-3xl font-bold text-yellow-400 mb-2">
                   {userCredits.loading ? (
-                    <div className="mx-auto w-40 h-6 rounded bg-white/10 animate-pulse" aria-hidden="true" />
+                    <div className="mx-auto w-40 h-6 rounded bg-foreground/10 animate-pulse" aria-hidden="true" />
                   ) : (
                     `${userCredits.credits.toLocaleString()} Credits`
                   )}
                 </div>
-                <p className="text-gray-400 text-sm">
+                <p className="text-foreground/60 text-sm">
                   Each case opening costs 88-100 credits
                 </p>
               </div>

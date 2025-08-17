@@ -445,15 +445,15 @@ export default function Home() {
   // Show wallet connection screen if not connected
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
         <WalletErrorHandler />
         <div className="max-w-lg w-full">
-          <div className="bg-black/40 backdrop-blur-md rounded-2xl p-8 border border-gray-700 shadow-2xl">
+          <div className="bg-card/60 backdrop-blur-md rounded-2xl p-8 border border-border shadow-2xl">
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
                 FudCoin
               </h1>
-              <p className="text-gray-300 text-lg">
+              <p className="text-foreground/70 text-lg">
                 Connect your Cardano wallet to start opening cases
               </p>
             </div>
@@ -471,13 +471,13 @@ export default function Home() {
 
   // Main casino interface
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       <WalletErrorHandler />
       {/* Navigation Header */}
       <motion.header 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="border-b border-gray-800/50 bg-black/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50"
+        className="border-b border-border bg-card/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50"
       >
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between relative">
           {/* Logo */}
@@ -499,17 +499,17 @@ export default function Home() {
           <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
             <motion.a 
               href="#cases" 
-              className="text-gray-300 hover:text-white transition-colors"
+              className="text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Cases
             </motion.a>
-            <Link href="/inventory" className="text-gray-300 hover:text-white transition-colors">
+            <Link href="/inventory" className="text-foreground/70 hover:text-foreground transition-colors">
               <motion.span whileHover={{ scale: 1.1 }}>Stash</motion.span>
             </Link>
             <motion.a 
               href="#rules" 
-              className="text-gray-300 hover:text-white transition-colors"
+              className="text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Rules
@@ -572,16 +572,16 @@ export default function Home() {
             <button
               onClick={() => setMobileMenuOpen(v => !v)}
               aria-label="Menu"
-              className="p-2 rounded-lg border border-gray-700 text-gray-200"
+              className="p-2 rounded-lg border border-border text-foreground/80"
             >
               ☰
             </button>
             {mobileMenuOpen && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-black/90 border border-gray-800 rounded-xl p-3 shadow-2xl">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-card/90 border border-border rounded-xl p-3 shadow-2xl">
                 <div className="flex flex-col gap-2">
-                  <a href="#cases" className="px-2 py-2 rounded-md text-sm text-gray-200 hover:bg-white/5">Cases</a>
-                  <Link href="/inventory" className="px-2 py-2 rounded-md text-sm text-gray-200 hover:bg-white/5">Stash</Link>
-                  <a href="#rules" className="px-2 py-2 rounded-md text-sm text-gray-200 hover:bg-white/5">Rules</a>
+                  <a href="#cases" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Cases</a>
+                  <Link href="/inventory" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Stash</Link>
+                  <a href="#rules" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Rules</a>
                   <div className="border-t border-gray-800 my-2" />
                   <div className="px-1">
                     <WalletBalance
@@ -604,13 +604,13 @@ export default function Home() {
 
       {/* Hero Section with Graffiti Case */}
       <motion.section 
-        className="relative py-20 overflow-hidden bg-black"
+        className="relative py-20 overflow-hidden bg-background"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 1 }}
       >
         {/* Dark Background Effects */}
-        <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-800"></div>
+        <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background"></div>
         <div className="absolute inset-0">
           {canUseComplexEffects && Array.from({ length: 15 }).map((_, i) => (
             <motion.div
@@ -643,7 +643,7 @@ export default function Home() {
             transition={{ delay: 0.4 }}
           >
             <div className="relative max-w-4xl mx-auto">
-              <div className="bg-black border-4 border-gray-700 rounded-3xl p-8 shadow-2xl">
+              <div className="bg-card border-4 border-border rounded-3xl p-8 shadow-2xl">
                 <img 
                   src="/werwrw.png"
                   alt="Graffiti Mystery Case"
@@ -693,7 +693,7 @@ export default function Home() {
 
       {/* Available Cases Section */}
       <section id="cases" className="py-20 relative">
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-gray-900 to-black"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background"></div>
         <div className="relative max-w-7xl mx-auto px-4">
           <motion.h2 
             className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent"
@@ -708,7 +708,7 @@ export default function Home() {
             {availableCases.map((caseItem, index) => (
               <motion.div
                 key={caseItem.id}
-                className="bg-black/40 backdrop-blur-md rounded-2xl overflow-hidden border border-gray-700 hover:border-orange-500/50 transition-all duration-300 group cursor-pointer shadow-xl hover:shadow-2xl"
+                className="bg-card/40 backdrop-blur-md rounded-2xl overflow-hidden border border-border hover:border-orange-500/50 transition-all duration-300 group cursor-pointer shadow-xl hover:shadow-2xl"
                 initial={{ y: 50, opacity: 0 }}
                 whileInView={{ y: 0, opacity: 1 }}
                 viewport={{ once: true }}
@@ -744,17 +744,17 @@ export default function Home() {
                     </div>
                   )}
                   {/* Overlay with case price */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/20"></div>
                   <div className="absolute top-3 right-3 bg-orange-500/90 text-white px-3 py-1 rounded-full text-sm font-semibold">
                     {caseItem.price} Credits
                   </div>
                 </div>
                 
                 <div className="p-6">
-                  <h3 className="text-lg font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">
+                  <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-orange-400 transition-colors">
                     {caseItem.name}
                   </h3>
-                  <p className="text-gray-400 text-sm mb-4 line-clamp-2">{caseItem.description}</p>
+                  <p className="text-foreground/60 text-sm mb-4 line-clamp-2">{caseItem.description}</p>
                   
                   <div className="flex justify-between items-center">
                     <span className="text-lg font-bold text-yellow-400">
@@ -785,34 +785,34 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-background/70 z-50 flex items-center justify-center p-4"
             onClick={() => setShowCreditsPopup(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-lg p-6 max-w-md w-full"
+              className="bg-card rounded-lg p-6 max-w-md w-full border border-border"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="text-center">
-                <h3 className="text-xl font-bold text-black mb-4">Credits</h3>
-                <div className="bg-gray-100 rounded-lg p-4 mb-6">
-                  <div className="text-2xl font-bold text-black mb-2">{userCredits.credits}</div>
-                  <div className="text-gray-600">Available Credits</div>
+                <h3 className="text-xl font-bold text-foreground mb-4">Credits</h3>
+                <div className="bg-background/40 rounded-lg p-4 mb-6 border border-border">
+                  <div className="text-2xl font-bold text-foreground mb-2">{userCredits.credits}</div>
+                  <div className="text-foreground/60">Available Credits</div>
                 </div>
                 <button
                   onClick={() => {
                     setShowCreditsPopup(false)
                     router.push('/credits')
                   }}
-                  className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors w-full mb-3"
+                  className="bg-foreground text-background px-6 py-3 rounded-lg font-medium hover:opacity-90 transition-colors w-full mb-3"
                 >
                   Add Credits
                 </button>
                 <button
                   onClick={() => setShowCreditsPopup(false)}
-                  className="text-gray-500 hover:text-gray-700 transition-colors"
+                  className="text-foreground/60 hover:text-foreground transition-colors"
                 >
                   Close
                 </button>

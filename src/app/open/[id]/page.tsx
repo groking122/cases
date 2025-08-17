@@ -7,6 +7,7 @@ import { useWallet } from '@meshsdk/react'
 import toast from 'react-hot-toast'
 import { EnhancedCaseOpening } from '@/components/EnhancedCaseOpening'
 import WalletSelector from '@/components/WalletSelector'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function OpenCasePage() {
   const params = useParams<{ id: string }>()
@@ -152,24 +153,45 @@ export default function OpenCasePage() {
   if (!caseData) return null
 
   return (
-    <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black" />
-      <div className="relative max-w-5xl mx-auto px-4 py-10">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+      {/* Header */}
+      <motion.header
+        initial={{ y: -80 }}
+        animate={{ y: 0 }}
+        className="border-b border-border bg-card/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50"
+      >
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <button
-            className="text-sm text-gray-400 hover:text-white"
+            className="text-sm text-foreground/70 hover:text-foreground"
             onClick={() => router.push('/')}
           >
             ← Back
           </button>
-          <div className="text-sm text-gray-400">{caseData.name} • {caseData.price} credits{userCredits !== null ? ` • Balance: ${userCredits}` : ''}</div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <button
+              onClick={() => router.push('/credits')}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-600 to-red-600 text-white border border-orange-500/30"
+            >
+              Buy Credits
+            </button>
+          </div>
+        </div>
+      </motion.header>
+
+      {/* Spacer for fixed header */}
+      <div className="h-14" />
+
+      <div className="relative max-w-5xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-sm text-foreground/70">{caseData.name} • {caseData.price} credits{userCredits !== null ? ` • Balance: ${userCredits}` : ''}</div>
         </div>
 
         {!connected ? (
           <div className="max-w-md mx-auto">
-            <div className="bg-black/70 border border-gray-700 rounded-2xl p-6 text-center">
+            <div className="bg-card/70 border border-border rounded-2xl p-6 text-center">
               <div className="text-2xl font-bold mb-2">Connect Wallet</div>
-              <p className="text-gray-400 mb-4">Connect your Cardano wallet to open this case.</p>
+              <p className="text-foreground/60 mb-4">Connect your Cardano wallet to open this case.</p>
               <WalletSelector 
                 onWalletSelect={(key) => connect(key)} 
                 onError={(e) => toast.error(e)} 
@@ -181,7 +203,7 @@ export default function OpenCasePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-black/60 rounded-2xl border border-gray-700 p-6 md:p-8"
+            className="bg-card/60 rounded-2xl border border-border p-6 md:p-8"
           >
             <EnhancedCaseOpening
                               selectedCase={{ 
