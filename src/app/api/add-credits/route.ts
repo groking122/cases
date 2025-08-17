@@ -95,7 +95,9 @@ export async function POST(request: NextRequest) {
         expectedAddress: paymentAddress?.substring(0, 20) + '...'
       })
       
-      const verificationResponse = await fetch(`${process.env.NEXT_PUBLIC_VERCEL_URL || 'http://localhost:3000'}/api/verify-payment`, {
+      // Use the current request origin to call the local verification endpoint reliably
+      const origin = request.nextUrl.origin
+      const verificationResponse = await fetch(`${origin}/api/verify-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
