@@ -3,32 +3,37 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 7%; /* Pure black */
-  --foreground: 0 0% 98%; /* Pure white */
-  --card: 0 0% 10%; /* Slightly lighter black */
-  --primary: 210 100% 50%; /* Vibrant blue */
-  --border: 0 0% 14.9%;
-  --input: 0 0% 14.9%;
-  --ring: 0 0% 83.1%;
+  /* Light theme */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --primary: 210 100% 50%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --ring: 0 0% 20%;
   --radius: 0.5rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  /* Dark theme */
+  --background: 0 0% 7%;
+  --foreground: 0 0% 98%;
+  --card: 0 0% 10%;
+  --primary: 210 100% 50%;
+  --border: 0 0% 14.9%;
+  --input: 0 0% 14.9%;
+  --ring: 0 0% 83.1%;
 }
 
 html {
-  background: #070707;
+  background: hsl(var(--background));
   overscroll-behavior: none;
   scroll-behavior: smooth;
 }
 
 body {
   @apply bg-background text-foreground min-h-screen;
-  background: linear-gradient(to bottom, #070707, #0a0a0a);
+  background: linear-gradient(to bottom, hsl(var(--background)), hsl(var(--background)));
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;

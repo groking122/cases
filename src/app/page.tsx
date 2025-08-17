@@ -16,6 +16,7 @@ import { useDeviceCapabilities } from "@/hooks/useDeviceCapabilities"
 import type { CaseOpening } from "@/types/database"
 import { SYMBOL_CONFIG } from "@/lib/symbols"
 import Link from 'next/link'
+import ThemeToggle from '@/components/ThemeToggle'
 
 
 interface Skin {
@@ -517,6 +518,7 @@ export default function Home() {
 
           {/* Right side - Add Credits, Connected Status, Wallet Balance (desktop) */}
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <motion.button
               onClick={handleInstantPurchaseOpen}
               className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 rounded-xl font-medium hover:from-orange-500 hover:to-red-500 transition-all shadow-lg border border-orange-500/30 backdrop-blur-sm"
@@ -557,6 +559,7 @@ export default function Home() {
 
           {/* Mobile actions */}
           <div className="md:hidden flex items-center gap-2">
+            <ThemeToggle />
             {connected && (
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-400" aria-label="Connected" />
             )}
