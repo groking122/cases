@@ -28,10 +28,10 @@ export default function InventoryPage() {
 
   if (!connected) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-black/60 rounded-2xl border border-gray-800 p-6 text-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-card rounded-2xl border border-border p-6 text-center">
           <div className="text-2xl font-bold mb-2">Connect Wallet</div>
-          <p className="text-gray-400 mb-4">Connect your Cardano wallet to view your credit chest.</p>
+          <p className="text-foreground/60 mb-4">Connect your Cardano wallet to view your stash.</p>
           <WalletSelector 
             onWalletSelect={handleWalletSelect} 
             onError={(e) => toast.error(e)} 
@@ -39,7 +39,7 @@ export default function InventoryPage() {
           />
           <motion.button
             onClick={() => router.push('/')}
-            className="mt-6 text-sm text-gray-400 hover:text-white"
+            className="mt-6 text-sm text-foreground/70 hover:text-foreground"
             whileHover={{ scale: 1.03 }}
           >
             ← Back to Home
@@ -50,18 +50,18 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-800 text-white">
-      <header className="border-b border-gray-800/50 bg-black/50 backdrop-blur-md">
+    <div className="min-h-screen bg-background text-foreground">
+      <header className="border-b border-border bg-card/70 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold">💎</span>
+            <div className="w-10 h-10 rounded-full flex items-center justify-center border border-border">
+              <span className="text-lg">💎</span>
             </div>
-            <span className="text-lg font-bold">Credit Chest</span>
+            <span className="text-lg font-bold">Stash</span>
           </div>
           <motion.button
             onClick={() => router.push('/')}
-            className="text-sm text-gray-300 hover:text-white"
+            className="text-sm text-foreground/70 hover:text-foreground"
             whileHover={{ scale: 1.05 }}
           >
             ← Back

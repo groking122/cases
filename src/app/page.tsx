@@ -17,6 +17,7 @@ import type { CaseOpening } from "@/types/database"
 import { SYMBOL_CONFIG } from "@/lib/symbols"
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
+import RulesPopup from '@/components/RulesPopup'
 
 
 interface Skin {
@@ -92,6 +93,7 @@ export default function Home() {
   // Credits popup state
   const [showCreditsPopup, setShowCreditsPopup] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showRules, setShowRules] = useState(false)
   
 
 
@@ -507,13 +509,13 @@ export default function Home() {
             <Link href="/inventory" className="text-foreground/70 hover:text-foreground transition-colors">
               <motion.span whileHover={{ scale: 1.1 }}>Stash</motion.span>
             </Link>
-            <motion.a 
-              href="#rules" 
+            <motion.button 
+              onClick={() => setShowRules(true)} 
               className="text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Rules
-            </motion.a>
+            </motion.button>
           </nav>
 
           {/* Right side - Add Credits, Connected Status, Wallet Balance (desktop) */}
@@ -581,7 +583,7 @@ export default function Home() {
                 <div className="flex flex-col gap-2">
                   <a href="#cases" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Cases</a>
                   <Link href="/inventory" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Stash</Link>
-                  <a href="#rules" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Rules</a>
+                  <button onClick={() => { setMobileMenuOpen(false); setShowRules(true) }} className="text-left px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Rules</button>
                   <div className="border-t border-gray-800 my-2" />
                   <div className="px-1">
                     <WalletBalance
@@ -821,6 +823,9 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Rules Popup */}
+      <RulesPopup isOpen={showRules} onClose={() => setShowRules(false)} />
 
       {/* Essential Modals */}
       <AnimatePresence>

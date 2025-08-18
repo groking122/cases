@@ -113,6 +113,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
   }, []);
 
   const handleOpenCase = useCallback(async () => {
+    if (isProcessing) return;
     if (!selectedCase || !connected) {
       toast.error('Please connect your wallet and select a case');
       return;
@@ -194,7 +195,6 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
       console.error('Case opening failed:', error);
       toast.error(error.message || 'Failed to open case');
       setStage('idle');
-    } finally {
       setIsProcessing(false);
     }
   }, [selectedCase, wallet, connected, userId, onCaseOpened, userCredits]);
@@ -289,14 +289,17 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                         setTimeout(() => {
                           setStage('idle');
                           setReward(null);
+                          // Re-enable after the full flow completes
+                          setIsProcessing(false);
                         }, 2000); // Longer idle transition
                       }, 5000); // 5 seconds celebration
                       
                     }, 2000); // 2 seconds for revealing stage
                   }, 1000) // 1 second before revealing
                 }}
-                spinDuration={3500} // 3.5 seconds anticipation phase
-                stopDuration={2500} // 2.5 seconds near-miss phase
+                spinDuration={3500}
+                stopDuration={2500}
+                compact={isMobile}
               />
             </div>
           ) : stage === 'revealing' || stage === 'celebration' ? (
@@ -554,7 +557,7 @@ const RewardReveal: React.FC<{ reward: Reward | null; stage: OpeningStage; isMob
         </motion.div>
         
         <motion.div
-          className="text-white font-bold text-xl sm:text-2xl mb-3 leading-tight"
+          className="text-white font-bold text-xl sm:text-2xl mb-1 leading-tight"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.5 }}
@@ -563,15 +566,18 @@ const RewardReveal: React.FC<{ reward: Reward | null; stage: OpeningStage; isMob
         </motion.div>
         
         <motion.div
-          className="w-16 h-4 mx-auto rounded-full mb-3"
+          className="w-20 h-6 sm:w-24 sm:h-7 mx-auto rounded-full mb-3 flex items-center justify-center text-[10px] sm:text-xs font-semibold"
           style={{ 
             background: `linear-gradient(to right, ${rarityConfig.color}, ${rarityConfig.borderColor})`,
-            boxShadow: `0 0 15px ${rarityConfig.glowColor}`
+            boxShadow: `0 0 15px ${rarityConfig.glowColor}`,
+            color: '#ffffff'
           }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.5 }}
-        />
+        >
+          {reward.rarity.charAt(0).toUpperCase() + reward.rarity.slice(1)}
+        </motion.div>
         
         <motion.div
           className="text-orange-200 font-semibold text-base sm:text-lg"
@@ -659,7 +665,7 @@ function getLoadingText(stage: OpeningStage): string {
 
 function getStageDescription(stage: OpeningStage): string {
   switch (stage) {
-    case 'shaking': return 'Building anticipation...';
+    case 'shaking': return '';
     case 'opening': return 'Unlocking your mystery box...';
     case 'spinning': return 'The reel is spinning...';
     case 'revealing': return 'Your reward is...';

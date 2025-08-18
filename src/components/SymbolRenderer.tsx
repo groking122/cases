@@ -15,13 +15,17 @@ interface SymbolRendererProps {
   size?: number
   revealAnimation?: boolean
   className?: string
+  showRarityLabel?: boolean
+  labelMode?: 'short' | 'full'
 }
 
 const SymbolRenderer = ({ 
   symbol, 
   size = 100,
   revealAnimation = false,
-  className = ""
+  className = "",
+  showRarityLabel = true,
+  labelMode = 'short'
 }: SymbolRendererProps) => {
   const [isLoaded, setIsLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
@@ -121,21 +125,25 @@ const SymbolRenderer = ({
         )}
       </div>
       
-      {/* Rarity indicator */}
-      <motion.div 
-        className={`absolute bottom-1 left-1 text-xs font-bold px-2 py-1 rounded-full ${
-          symbol.rarity === 'legendary' ? 'text-yellow-300 bg-yellow-900/50' : 
-          symbol.rarity === 'epic' ? 'text-purple-300 bg-purple-900/50' : 
-          symbol.rarity === 'rare' ? 'text-blue-300 bg-blue-900/50' :
-          symbol.rarity === 'uncommon' ? 'text-green-300 bg-green-900/50' :
-          'text-gray-300 bg-gray-900/50'
-        }`}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: revealAnimation ? 0.3 : 0 }}
-      >
-        {symbol.rarity.slice(0, 3).toUpperCase()}
-      </motion.div>
+      {/* Rarity indicator (optional) */}
+      {showRarityLabel && (
+        <motion.div 
+          className={`absolute bottom-1 left-1 text-xs font-bold px-2 py-1 rounded-full ${
+            symbol.rarity === 'legendary' ? 'text-yellow-300 bg-yellow-900/50' : 
+            symbol.rarity === 'epic' ? 'text-purple-300 bg-purple-900/50' : 
+            symbol.rarity === 'rare' ? 'text-blue-300 bg-blue-900/50' :
+            symbol.rarity === 'uncommon' ? 'text-green-300 bg-green-900/50' :
+            'text-gray-300 bg-gray-900/50'
+          }`}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: revealAnimation ? 0.3 : 0 }}
+        >
+          {labelMode === 'full' 
+            ? symbol.rarity.charAt(0).toUpperCase() + symbol.rarity.slice(1)
+            : symbol.rarity.slice(0, 3).toUpperCase()}
+        </motion.div>
+      )}
 
       {/* Special effects for high rarities */}
       {symbol.rarity === 'legendary' && (

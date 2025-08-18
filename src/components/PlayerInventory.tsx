@@ -288,114 +288,64 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-background/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        className="bg-gray-900 border border-gray-700 rounded-xl max-w-6xl w-full max-h-[90vh] overflow-hidden"
+        className="bg-card border border-border rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 p-6 border-b border-gray-700">
+        <div className="bg-gradient-to-r from-orange-600/15 to-red-600/15 p-5 border-b border-border">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">💎 Credit Chest</h2>
-              <div className="flex gap-6 text-sm text-gray-300 mb-3">
-                <span>Current Credits: <span className="text-yellow-400 font-bold">{userCredits.toLocaleString()}</span></span>
-                <span>≈ <span className="text-blue-300 font-bold">{(userCredits * 0.01).toFixed(2)} ADA</span></span>
-                <span>Total Wins: {inventory.length}</span>
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={() => setShowWithdrawalForm(true)}
-                  disabled={userCredits < 1000}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2"
-                  size="sm"
-                >
-                  {userCredits < 1000 ? '🔒 Need 1000+ Credits' : '🏦 Withdraw ADA'}
-                </Button>
-              </div>
+              <h2 className="text-xl font-bold text-foreground mb-1">💎 Stash</h2>
+              <div className="text-sm text-foreground/70 mb-3">Balance: <span className="font-semibold text-orange-400">{userCredits.toLocaleString()} credits</span> • ≈ {(userCredits * 0.01).toFixed(2)} ADA</div>
+              <Button onClick={() => setShowWithdrawalForm(true)} disabled={userCredits < 1000} className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white text-sm px-4 py-2" size="sm">
+                {userCredits < 1000 ? '🔒 Need 1,000+' : '🏦 Withdraw'}
+              </Button>
             </div>
-            <Button onClick={onClose} variant="outline" className="border-gray-600">
+            <Button onClick={onClose} variant="outline" className="border-border">
               ✕ Close
             </Button>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="p-6 border-b border-gray-700 bg-gray-800/50">
-          <div className="flex flex-wrap gap-4">
-            {/* Status Filter */}
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setFilter('all')}
-                variant={filter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                className={filter === 'all' ? 'bg-purple-600' : 'border-gray-600'}
-              >
-                All
-              </Button>
-              <Button
-                onClick={() => setFilter('available')}
-                variant={filter === 'available' ? 'default' : 'outline'}
-                size="sm"
-                className={filter === 'available' ? 'bg-green-600' : 'border-gray-600'}
-              >
-                Available
-              </Button>
-              <Button
-                onClick={() => setFilter('sold')}
-                variant={filter === 'sold' ? 'default' : 'outline'}
-                size="sm"
-                className={filter === 'sold' ? 'bg-red-600' : 'border-gray-600'}
-              >
-                Sold
-              </Button>
-            </div>
-
-
-          </div>
-        </div>
+        {/* Minimal header only; removed old filters and lists */}
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-96">
           {loading ? (
-            <div className="text-center text-gray-400 py-8">
+            <div className="text-center text-foreground/60 py-8">
               <div className="animate-spin text-2xl mb-2">⚙️</div>
               Loading chest...
             </div>
           ) : (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">💎</div>
-              <div className="text-2xl font-bold text-white mb-4">
+              <div className="text-2xl font-bold text-foreground mb-4">
                 {userCredits.toLocaleString()} Credits Available
               </div>
-              <div className="text-lg text-blue-300 mb-6">
+              <div className="text-lg text-foreground/70 mb-6">
                 ≈ {(userCredits * 0.01).toFixed(2)} ADA
               </div>
               
               {userCredits >= 1000 ? (
                 <div className="space-y-4">
-                  <div className="text-gray-300">
-                    Withdraw between 1,000 and 20,000 credits as ADA to your connected wallet
+                  <div className="text-foreground/70">
+                    Withdraw 1,000–20,000 credits as ADA to your connected wallet.
                   </div>
                   <Button
                     onClick={() => setShowWithdrawalForm(true)}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 text-lg"
+                    className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white px-8 py-3 text-lg"
                   >
                     🏦 Withdraw ADA
                   </Button>
                 </div>
               ) : (
-                <div className="text-gray-400">
+                <div className="text-foreground/60">
                   <div className="text-lg mb-2">🔒 Withdrawals require minimum 1,000 credits</div>
                   <div className="text-sm">Open more cases to reach the minimum!</div>
-                </div>
-              )}
-              
-              {creditEntries.length > 0 && (
-                <div className="mt-8 text-sm text-gray-500">
-                  You have {creditEntries.length} individual wins that can be converted to credits
                 </div>
               )}
             </div>
@@ -410,7 +360,7 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-background/80 z-60 flex items-center justify-center p-4"
             onClick={() => setShowWithdrawalForm(false)}
           >
             <motion.div
@@ -418,18 +368,18 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-gray-800 border border-gray-600 rounded-xl p-6 max-w-md w-full"
+              className="bg-card border border-border rounded-2xl p-6 max-w-md w-full"
             >
-              <h3 className="text-xl font-bold text-white mb-4 text-center">🏦 Withdraw Credits as ADA</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4 text-center">🏦 Withdraw Credits as ADA</h3>
               
               <div className="mb-6">
-                <div className="bg-gray-700/50 rounded-lg p-4 mb-4">
+                <div className="bg-background/50 rounded-lg p-4 mb-4 border border-border">
                   <div className="text-center">
-                    <div className="text-sm text-gray-400 mb-1">Available Credits</div>
-                    <div className="text-2xl font-bold text-yellow-400 mb-1">
+                    <div className="text-sm text-foreground/60 mb-1">Available Credits</div>
+                    <div className="text-2xl font-bold text-orange-400 mb-1">
                       {userCredits.toLocaleString()}
                     </div>
-                    <div className="text-blue-300 text-sm">
+                    <div className="text-foreground/70 text-sm">
                       ≈ {(userCredits * 0.01).toFixed(2)} ADA
                     </div>
                   </div>
@@ -437,7 +387,7 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
                       Withdrawal Amount (Credits)
                     </label>
                     <input
@@ -447,23 +397,23 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                       step="100"
                       value={withdrawalAmount}
                       onChange={(e) => setWithdrawalAmount(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+                      className="w-full h-2 bg-foreground/20 rounded-lg appearance-none cursor-pointer slider"
                     />
-                    <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <div className="flex justify-between text-xs text-foreground/60 mt-1">
                       <span>1,000</span>
                       <span>{Math.min(userCredits, 20000).toLocaleString()}</span>
                     </div>
                   </div>
                   
-                  <div className="bg-blue-900/30 border border-blue-600/30 rounded-lg p-4">
+                  <div className="bg-orange-600/10 border border-orange-500/30 rounded-lg p-4">
                     <div className="text-center">
-                      <div className="text-lg font-bold text-white mb-1">
+                      <div className="text-lg font-bold text-foreground mb-1">
                         {withdrawalAmount.toLocaleString()} credits
                       </div>
-                      <div className="text-blue-300">
+                      <div className="text-foreground/70">
                         ≈ {(withdrawalAmount * 0.01).toFixed(2)} ADA
                       </div>
-                      <div className="text-xs text-gray-400 mt-2">
+                      <div className="text-xs text-foreground/60 mt-2">
                         Will be sent to your connected wallet
                       </div>
                     </div>
@@ -477,13 +427,13 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                       step="100"
                       value={withdrawalAmount}
                       onChange={(e) => setWithdrawalAmount(Math.max(1000, Math.min(parseInt(e.target.value) || 1000, Math.min(userCredits, 20000))))}
-                      className="flex-1 p-3 bg-gray-700 border border-gray-600 rounded-lg text-white text-center"
+                      className="flex-1 p-3 bg-background border border-border rounded-lg text-foreground text-center"
                       placeholder="Enter amount"
                     />
                     <Button
                       onClick={() => setWithdrawalAmount(Math.min(userCredits, 20000))}
                       variant="outline"
-                      className="border-gray-600 text-gray-300"
+                      className="border-border text-foreground/80"
                     >
                       Max
                     </Button>
@@ -495,13 +445,13 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                 <Button
                   onClick={() => setShowWithdrawalForm(false)}
                   variant="outline"
-                  className="flex-1 border-gray-600"
+                  className="flex-1 border-border"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => setShowConfirmation(true)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  className="flex-1 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400"
                   disabled={withdrawalAmount < 1000 || withdrawalAmount > userCredits || withdrawalAmount > 20000}
                 >
                   Continue
@@ -519,31 +469,31 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 z-70 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-background/80 z-70 flex items-center justify-center p-4"
           >
             <motion.div
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0.9 }}
-              className="bg-gray-800 border border-red-500/50 rounded-xl p-6 max-w-sm w-full"
+              className="bg-card border border-red-500/40 rounded-2xl p-6 max-w-sm w-full"
             >
               <div className="text-center">
                 <div className="text-4xl mb-4">⚠️</div>
-                <h3 className="text-xl font-bold text-white mb-4">Confirm Withdrawal</h3>
+                <h3 className="text-xl font-bold text-foreground mb-4">Confirm Withdrawal</h3>
                 
-                <div className="bg-red-900/30 border border-red-600/30 rounded-lg p-4 mb-6">
-                  <div className="text-lg font-bold text-white mb-1">
+                <div className="bg-red-600/10 border border-red-500/30 rounded-lg p-4 mb-6">
+                  <div className="text-lg font-bold text-foreground mb-1">
                     {withdrawalAmount.toLocaleString()} credits
                   </div>
-                  <div className="text-blue-300 mb-2">
+                  <div className="text-foreground/70 mb-2">
                     ≈ {(withdrawalAmount * 0.01).toFixed(2)} ADA
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-foreground/60">
                     This action cannot be undone
                   </div>
                 </div>
                 
-                <div className="text-sm text-gray-300 mb-6">
+                <div className="text-sm text-foreground/80 mb-6">
                   Are you sure you want to withdraw {withdrawalAmount.toLocaleString()} credits as ADA to your connected wallet?
                 </div>
               </div>
@@ -552,13 +502,13 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
                 <Button
                   onClick={() => setShowConfirmation(false)}
                   variant="outline"
-                  className="flex-1 border-gray-600"
+                  className="flex-1 border-border"
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => handleCreditWithdrawalRequest(withdrawalAmount)}
-                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  className="flex-1 bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400"
                   disabled={withdrawalSubmitting}
                 >
                   {withdrawalSubmitting ? '⚙️ Processing...' : 'Confirm Withdrawal'}

@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { EnhancedCaseOpening } from '@/components/EnhancedCaseOpening'
 import WalletSelector from '@/components/WalletSelector'
 import ThemeToggle from '@/components/ThemeToggle'
+import RulesPopup from '@/components/RulesPopup'
 
 export default function OpenCasePage() {
   const params = useParams<{ id: string }>()
@@ -15,6 +16,7 @@ export default function OpenCasePage() {
   const { connected, wallet, connect, connecting } = useWallet()
   const [userCredits, setUserCredits] = useState<number | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [showRules, setShowRules] = useState(false)
 
   const [caseData, setCaseData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
@@ -170,6 +172,12 @@ export default function OpenCasePage() {
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <button
+              onClick={() => setShowRules(true)}
+              className="px-3 py-2 rounded-lg text-xs font-semibold border border-border"
+            >
+              Rules
+            </button>
+            <button
               onClick={() => router.push('/credits')}
               className="px-3 py-2 rounded-lg text-xs font-semibold bg-gradient-to-r from-orange-600 to-red-600 text-white border border-orange-500/30"
             >
@@ -178,6 +186,9 @@ export default function OpenCasePage() {
           </div>
         </div>
       </motion.header>
+
+      {/* Rules Popup */}
+      <RulesPopup isOpen={showRules} onClose={() => setShowRules(false)} />
 
       {/* Spacer for fixed header */}
       <div className="h-14" />

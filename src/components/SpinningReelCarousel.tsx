@@ -15,6 +15,7 @@ interface SpinningReelCarouselProps {
   onComplete: () => void
   spinDuration?: number
   stopDuration?: number
+  compact?: boolean
 }
 
 export function SpinningReelCarousel({ 
@@ -24,7 +25,8 @@ export function SpinningReelCarousel({
   seed,
   onComplete,
   spinDuration = 3000,
-  stopDuration = 2000
+  stopDuration = 2000,
+  compact = false
 }: SpinningReelCarouselProps) {
   console.log('🎰 SpinningReelCarousel component mounted/rendered', { isSpinning, winningItem })
   
@@ -265,8 +267,10 @@ export function SpinningReelCarousel({
 
   console.log('🎰 Rendering carousel with', reelItems.current.length, 'items')
 
+  const containerHeights = compact ? 'h-40' : 'h-52 sm:h-64'
+
   return (
-    <div className="relative w-full h-52 sm:h-64 overflow-hidden bg-gradient-to-r from-gray-900/80 via-black to-gray-800/80 rounded-2xl border-4 border-orange-500/60 shadow-2xl">
+    <div className={`relative w-full ${containerHeights} overflow-hidden bg-gradient-to-r from-gray-900/80 via-black to-gray-800/80 rounded-2xl border-4 border-orange-500/60 shadow-2xl`}>
       
       {/* Center line indicator - orange theme */}
       <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-3 h-full bg-gradient-to-b from-orange-400 via-white to-orange-400 z-30 shadow-[0_0_30px_rgba(249,115,22,0.8)] blur-[1px] rounded-full" />
@@ -412,6 +416,7 @@ export function SpinningReelCarousel({
                       rarity: item.rarity
                     }}
                     size={isMobile ? 52 : 64}
+                    showRarityLabel={false}
                   />
                   {/* Glass reflection overlay */}
                   {canUseComplexEffects && (
@@ -460,9 +465,9 @@ export function SpinningReelCarousel({
           title="Click to skip celebration"
         >
           {/* Main celebration banner */}
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 px-2">
             <motion.div 
-              className="bg-gradient-to-r from-orange-500 via-orange-600 to-orange-500 text-white px-12 py-6 rounded-3xl font-bold text-2xl shadow-2xl border-4 border-orange-400"
+              className="bg-gradient-to-r from-orange-500 via-orange-600 to-orange-500 text-white px-6 py-3 sm:px-10 sm:py-5 rounded-2xl sm:rounded-3xl font-bold text-sm sm:text-xl shadow-2xl border-2 sm:border-4 border-orange-400"
               animate={{
                 scale: [1, 1.05, 1],
                 boxShadow: [
@@ -477,7 +482,7 @@ export function SpinningReelCarousel({
                 ease: "easeInOut"
               }}
             >
-              REWARD UNLOCKED!
+              Reward Unlocked
             </motion.div>
           </div>
           
@@ -505,7 +510,7 @@ export function SpinningReelCarousel({
 
       {/* Sustain phase overlay - CLICKABLE */}
       {animationState === 'sustain' && (
-        <div className="absolute inset-0 z-40 flex items-end justify-center pb-16">
+        <div className="absolute inset-0 z-40 flex items-end justify-center pb-6 sm:pb-16 px-2">
           <motion.button 
             onClick={() => {
               console.log('🏆 User clicked to claim reward!')
@@ -513,7 +518,7 @@ export function SpinningReelCarousel({
               onComplete()
             }}
             onMouseEnter={() => casinoSoundManager.playSound('hover')}
-            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white px-12 py-5 rounded-2xl font-bold text-xl shadow-2xl cursor-pointer transform transition-all duration-300 border-2 border-orange-400/50"
+            className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white px-6 py-3 sm:px-10 sm:py-4 rounded-xl sm:rounded-2xl font-semibold sm:font-bold text-sm sm:text-lg shadow-2xl cursor-pointer transform transition-all duration-300 border border-orange-400/50"
             animate={{
               scale: [1, 1.03, 1],
               opacity: [0.95, 1, 0.95],
@@ -537,7 +542,7 @@ export function SpinningReelCarousel({
               scale: 0.98
             }}
           >
-            CLAIM REWARD
+            Claim Reward
           </motion.button>
         </div>
       )}
