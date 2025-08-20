@@ -102,32 +102,57 @@ export async function POST(request: NextRequest) {
       
       // Use the current request origin to call the local verification endpoint reliably
       const origin = request.nextUrl.origin
-      const verificationResponse = await fetch(`${origin}/api/verify-payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          txHash,
-          expectedAmount: paymentAmount,
-          expectedAddress: paymentAddress
-        })
+
+      // Log environment snapshot for fast diagnosis
+      console.log('verify-payment snapshot', {
+        net: process.env.CARDANO_NETWORK,
+        hasKey: !!process.env.BLOCKFROST_API_KEY,
+        expectedAddress: paymentAddress?.substring(0, 30) + '...',
+        txHash: txHash.substring(0, 16) + '...'
       })
 
-      if (!verificationResponse.ok) {
-        const verificationError = await verificationResponse.json()
-        console.error('❌ Transaction verification failed:', verificationError)
-        return NextResponse.json(
-          { error: `Payment verification failed: ${verificationError.error}` },
-          { status: 400 }
-        )
+      // Server-side retry/backoff (handles indexer lag)
+      let attempt = 0
+      const maxAttempts = 5
+      let verifiedOk = false
+      let lastStatus = 0
+      let lastBody: any = null
+
+      while (attempt < maxAttempts) {
+        const res = await fetch(`${origin}/api/verify-payment`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            txHash,
+            expectedAmount: paymentAmount,
+            expectedAddress: paymentAddress
+          })
+        })
+        lastStatus = res.status
+        try { lastBody = await res.json() } catch { lastBody = null }
+
+        if (res.ok && lastBody?.success && lastBody?.verified) {
+          verifiedOk = true
+          break
+        }
+
+        // Pending or not found → backoff and retry
+        if (res.status === 202 || res.status === 404 || (lastBody && (lastBody.status === 'pending'))) {
+          const delayMs = Math.min(Math.pow(2, attempt) * 1000, 16000)
+          console.log(`⏳ Waiting ${delayMs}ms before re-verify (attempt ${attempt + 1}/${maxAttempts})`)
+          await new Promise(r => setTimeout(r, delayMs))
+          attempt++
+          continue
+        }
+
+        // Hard error (auth, misconfig, etc.)
+        break
       }
 
-      const verificationResult = await verificationResponse.json()
-      if (!verificationResult.success || !verificationResult.verified) {
-        console.error('❌ Transaction not verified:', verificationResult)
-        return NextResponse.json(
-          { error: 'Transaction could not be verified on blockchain' },
-          { status: 400 }
-        )
+      if (!verifiedOk) {
+        // Still pending or failed after retries → signal client to poll
+        console.warn('⚠️ Verification pending/failed after retries', { lastStatus, lastBody })
+        return NextResponse.json({ status: 'pending', retryAfter: 5 }, { status: 202 })
       }
 
       console.log('✅ Transaction verified on blockchain')
