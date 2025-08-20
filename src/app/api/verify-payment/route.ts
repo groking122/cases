@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
       
       // Fetch transaction details from Cardano blockchain with retry logic
       let attempts = 0
-      const maxAttempts = 3
+      const maxAttempts = 5
       
       while (attempts < maxAttempts) {
         try {
@@ -178,21 +178,23 @@ export async function POST(request: NextRequest) {
               )
             }
 
-            // Generic error fallback
-            console.error('❌ Blockfrost API failed after all retries')
+            // Generic error fallback: return pending so client can poll
+            console.error('❌ Blockfrost API failed after all retries - returning 202 PENDING')
             return NextResponse.json(
-              { 
-                error: 'Payment verification temporarily unavailable',
-                details: 'Blockchain verification service is experiencing issues. Please try again in a few minutes.',
+              {
+                status: 'pending',
+                error: 'Payment verification pending',
+                details: 'Blockchain indexer is catching up. Please retry shortly.',
                 txHash: txHash,
-                canRetry: true
+                canRetry: true,
+                retryAfter: 5
               },
-              { status: 503 }
+              { status: 202 }
             )
           }
           
-          // Wait before retrying (exponential backoff)
-          const waitTime = Math.pow(2, attempts - 1) * 1000 // 1s, 2s, 4s
+          // Wait before retrying (exponential backoff up to ~16s)
+          const waitTime = Math.min(Math.pow(2, attempts - 1) * 1000, 16000)
           console.log(`⏳ Waiting ${waitTime}ms before retry...`)
           await new Promise(resolve => setTimeout(resolve, waitTime))
         }
