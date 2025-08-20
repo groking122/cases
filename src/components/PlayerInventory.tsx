@@ -48,7 +48,9 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
 
       if (response.ok) {
         const data = await response.json()
-        setUserCredits(data.credits || 0)
+        if (typeof data.credits === 'number') {
+          setUserCredits(data.credits)
+        }
       }
     } catch (error) {
       console.error('Failed to fetch credits:', error)
