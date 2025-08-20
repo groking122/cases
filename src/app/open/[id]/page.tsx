@@ -60,7 +60,9 @@ export default function OpenCasePage() {
       try {
         const addresses = await wallet.getUsedAddresses()
         const walletAddress = addresses[0]
-        const res = await fetch('/api/get-credits', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` } })
+        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+        if (!token) return
+        const res = await fetch('/api/get-credits', { method: 'POST' })
         const data = await res.json()
         if (res.ok) setUserCredits(data.credits || 0)
       } catch {}
@@ -107,7 +109,7 @@ export default function OpenCasePage() {
     // Call open-case-credits
     const res = await fetch('/api/open-case-credits', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
       body: JSON.stringify({
         userId: userData.user.id,
         caseId: caseData.id,

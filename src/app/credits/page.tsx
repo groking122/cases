@@ -36,11 +36,13 @@ export default function CreditsPage() {
       const walletAddress = addresses[0]
       setWalletAddress(walletAddress)
       
-      // Fetch credits (JWT auth)
-      const response = await fetch('/api/get-credits', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
-      })
+      // Fetch credits (JWT auth) - uses cookie fallback via server
+      const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      if (!token) {
+        setUserCredits(prev => ({ ...prev, loading: false }))
+        return
+      }
+      const response = await fetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()

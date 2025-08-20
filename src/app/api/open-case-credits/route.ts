@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { withRateLimit, caseOpeningLimiter } from '@/lib/rate-limit.js';
 import { getSecureRandomForCaseOpening, generateServerSeed } from '@/lib/entropy.js';
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
+import { withUserAuth } from '@/lib/mw/withUserAuth'
 import { getPityConfigForCase } from '@/config/pity';
 import { applyCredit } from '@/lib/credits/applyCredit'
 import { amountToJSON } from '@/lib/credits/format'
@@ -22,10 +23,8 @@ async function caseOpeningHandler(request: NextRequest) {
 
     const { caseId, clientSeed } = await request.json();
 
-    // Derive user identity from JWT only
-    const token = getBearerToken(request.headers.get('authorization'))
-    const userPayload = token ? verifyUserToken(token) : null
-    const userId = userPayload?.userId
+    // Derive user identity from auth wrapper (header or cookie)
+    const userId = (request as any)?.user?.id
 
     console.log('🎰 Case opening request:', {
       userId,
@@ -557,4 +556,4 @@ function calculateStreakBonus(recentOpenings: any[], currentIsProfit: boolean): 
 }
 
 // Export the handler wrapped with rate limiting
-export const POST = withRateLimit(caseOpeningLimiter, caseOpeningHandler); 
+export const POST = withRateLimit(caseOpeningLimiter, withUserAuth(caseOpeningHandler as any) as any);

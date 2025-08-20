@@ -146,7 +146,7 @@ export default function Home() {
       // Call backend API to open case with credits
       const response = await fetch('/api/open-case-credits', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
         body: JSON.stringify({
           userId,
           caseId: selectedCase.id,
@@ -188,11 +188,29 @@ export default function Home() {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
       
-      // Fetch credits
-      const response = await fetch('/api/get-credits', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
-      })
+      // Ensure token exists (perform nonce/verify if needed)
+      let token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      if (!token && walletAddress) {
+        try {
+          const nonceRes = await fetch('/api/auth/wallet/nonce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ walletAddress }) })
+          const nonceData = await nonceRes.json()
+          if (nonceRes.ok && nonceData?.nonce) {
+            const verifyRes = await fetch('/api/auth/wallet/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ walletAddress, signature: nonceData.nonce }) })
+            const verifyData = await verifyRes.json()
+            if (verifyRes.ok && verifyData?.token) {
+              localStorage.setItem('userToken', verifyData.token)
+              try { window.dispatchEvent(new Event('user-token-set')) } catch {}
+              token = verifyData.token
+            }
+          }
+        } catch {}
+      }
+      
+      if (!token) {
+        setUserCredits(prev => ({ ...prev, loading: false }))
+        return 0
+      }
+      const response = await fetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()

@@ -42,10 +42,9 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
     if (!connected || !wallet) return
 
     try {
-      const response = await fetch('/api/get-credits', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` }
-      })
+      const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      if (!token) return
+      const response = await fetch('/api/get-credits', { method: 'POST' })
 
       if (response.ok) {
         const data = await response.json()

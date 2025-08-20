@@ -132,8 +132,13 @@ export default function Home() {
       if (!currentWalletAddress) return
       
       setWalletAddress(currentWalletAddress)
-      
-      const response = await fetch('/api/get-credits', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` } })
+      // Guard fetch until token exists
+      const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      if (!token) {
+        setUserCredits(prev => ({ ...prev, loading: false }))
+        return
+      }
+      const response = await fetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()
@@ -237,7 +242,7 @@ export default function Home() {
       // Call backend API to open case with credits (with timing tracking)
       const response = await fetch('/api/open-case-credits', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
         body: JSON.stringify({
           userId,
           caseId: selectedCase.id,

@@ -179,7 +179,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
       // Call the API
       const response = await fetch('/api/open-case-credits', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
         body: JSON.stringify({
           userId: effectiveUserId,
           caseId: selectedCase.id,

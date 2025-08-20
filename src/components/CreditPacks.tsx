@@ -324,10 +324,8 @@ export default function CreditPacks({
       
       // Get updated credits from the API
       try {
-        const creditsResponse = await fetch('/api/get-credits', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` }
-        })
+        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+        const creditsResponse = await fetch('/api/get-credits', { method: 'POST' })
         
         if (creditsResponse.ok) {
           const creditsData = await creditsResponse.json()
