@@ -319,27 +319,20 @@ export default function CreditPacks({
         }
       }
 
-      // Success! Get updated credits from user's account
+      // Success! Purchase completed
       console.log('🎉 Purchase completed successfully!')
-      
-      // Get updated credits from the API
-      try {
-        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
-        const creditsResponse = await fetch('/api/get-credits', { method: 'POST' })
-        
-        if (creditsResponse.ok) {
-          const creditsData = await creditsResponse.json()
-          console.log('💰 Updated credits:', creditsData.credits)
-          onCreditsUpdated(creditsData.credits || 0)
-        } else {
-          console.warn('Could not fetch updated credits, using estimated amount')
-          // Fallback: use the purchased amount (this might not be accurate if user had existing credits)
-          onCreditsUpdated(pack.credits)
-        }
-      } catch (error) {
-        console.warn('Error fetching updated credits:', error)
-        onCreditsUpdated(pack.credits)
-      }
+      // Optional: background refresh without overwriting current value on failure
+      ;(async () => {
+        try {
+          const res = await fetch('/api/get-credits', { method: 'POST' })
+          if (!res.ok) return
+          const data = await res.json()
+          if (typeof data?.credits === 'number' && data.credits >= 0) {
+            console.log('💰 Background refreshed credits:', data.credits)
+            onCreditsUpdated(data.credits)
+          }
+        } catch {}
+      })()
       
       if (onPurchaseSuccess) {
         onPurchaseSuccess(pack.credits, txHash)
