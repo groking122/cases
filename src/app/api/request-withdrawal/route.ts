@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
+import { withRateLimit, userRateLimiter } from '@/lib/rate-limit.js'
 
-export async function POST(request: NextRequest) {
+async function handler(request: NextRequest) {
   try {
     // Derive identity from JWT only
     const token = getBearerToken(request.headers.get('authorization'))
@@ -114,20 +115,37 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // 💰 DEDUCT CREDITS IMMEDIATELY when request is made
-    const newCreditBalance = user.credits - creditsToRequest
-    
-    const { error: creditDeductError } = await supabaseAdmin
-      .from('users')
-      .update({ 
-        credits: newCreditBalance,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', userId)
+    // 💰 DEDUCT CREDITS IMMEDIATELY when request is made via guarded RPC + event
+    const withdrawIdemKey = `withdraw:req:${userId}:${caseOpeningId || 'bulk'}:${creditsToRequest}`
+    // Record idempotency event (ignore duplicate)
+    const { error: withdrawEventErr } = await supabaseAdmin
+      .from('credit_events')
+      .insert({ user_id: userId, delta: -creditsToRequest, reason: 'withdrawal_request', key: withdrawIdemKey })
+    if (withdrawEventErr && (withdrawEventErr as any).code !== '23505') {
+      console.error('Error recording withdrawal event:', withdrawEventErr)
+      return NextResponse.json({ error: 'Failed to record withdrawal event' }, { status: 500 })
+    }
 
-    if (creditDeductError) {
-      console.error('Error deducting credits:', creditDeductError)
-      return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
+    let newCreditBalance = user.credits
+    if (!withdrawEventErr) {
+      const { data: rpcRes, error: rpcErr } = await supabaseAdmin
+        .rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: -creditsToRequest })
+      if (rpcErr) {
+        if (String(rpcErr.message || '').toLowerCase().includes('insufficient')) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 400 })
+        }
+        console.error('Error deducting credits (rpc):', rpcErr)
+        return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
+      }
+      newCreditBalance = rpcRes?.new_amount ?? rpcRes?.amount ?? (user.credits - creditsToRequest)
+    } else {
+      // Duplicate idempotency: read current balance
+      const { data: balNow } = await supabaseAdmin
+        .from('balances')
+        .select('amount')
+        .eq('user_id', userId)
+        .single()
+      newCreditBalance = balNow?.amount ?? user.credits
     }
 
     // Create withdrawal request record with fraud detection data
@@ -159,10 +177,14 @@ export async function POST(request: NextRequest) {
       console.error('Error creating withdrawal request:', insertError)
       
       // Rollback credit deduction on error
-      await supabaseAdmin
-        .from('users')
-        .update({ credits: user.credits })
-        .eq('id', userId)
+      // If creating the withdrawal request failed, attempt to refund credits idempotently
+      const refundKey = `${withdrawIdemKey}:refund`
+      const { error: refundEventErr } = await supabaseAdmin
+        .from('credit_events')
+        .insert({ user_id: userId, delta: creditsToRequest, reason: 'withdrawal_request_refund', key: refundKey })
+      if (!refundEventErr) {
+        await supabaseAdmin.rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: creditsToRequest })
+      }
         
       return NextResponse.json({ error: 'Failed to create withdrawal request' }, { status: 500 })
     }
@@ -253,6 +275,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+// Apply a simple wrapper limiter (3 req / 3s IP window via caseOpeningLimiter style is fine)
+export const POST = withRateLimit({
+  check: async (req: NextRequest) => {
+    // Lightweight IP-based limiter using UserRateLimiter in a generic way
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || 'unknown'
+    await userRateLimiter.checkUser(ip, 'withdrawal')
+  }
+} as any, handler)
 
 // Enhanced email notification function with security details
 async function sendWithdrawalNotification(details: any) {

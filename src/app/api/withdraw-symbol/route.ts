@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
   try {
     const { itemId, withdrawalType } = await request.json();
+
+    // Require user auth and derive identity from JWT
+    const token = getBearerToken(request.headers.get('authorization'))
+    const payload = token ? verifyUserToken(token) : null
+    const userId = payload?.userId
+    if (!userId) {
+      return NextResponse.json({ error: 'Missing or invalid token' }, { status: 401 })
+    }
 
     if (!itemId || !withdrawalType) {
       return NextResponse.json({ 
@@ -36,6 +45,7 @@ export async function POST(request: NextRequest) {
         users(wallet_address)
       `)
       .eq('id', itemId)
+      .eq('user_id', userId)
       .single();
 
     if (fetchError || !caseOpening) {
@@ -49,24 +59,26 @@ export async function POST(request: NextRequest) {
     // Generate transaction hash for the sale
     const txHash = generateTransactionHash();
     
-    // Get current user credits and add the reward value
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('credits')
-      .eq('id', caseOpening.user_id)
-      .single();
+    // Idempotently credit reward to balances via RPC
+    // Ensure balance row exists
+    await supabaseAdmin.from('balances').upsert({ user_id: caseOpening.user_id, amount: 0 })
 
-    if (userError || !userData) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const saleKey = `withdraw:symbol:${itemId}`
+    const { error: eventErr } = await supabaseAdmin
+      .from('credit_events')
+      .insert({ user_id: caseOpening.user_id, delta: caseOpening.reward_value, reason: 'symbol_sale', key: saleKey })
+    if (eventErr && (eventErr as any).code !== '23505') {
+      console.error('Error recording credit event:', eventErr)
+      return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
     }
-
-    const newCredits = (userData.credits || 0) + caseOpening.reward_value;
-
-    // Update user credits
-    const { error: creditError } = await supabaseAdmin
-      .from('users')
-      .update({ credits: newCredits })
-      .eq('id', caseOpening.user_id);
+    if (!eventErr) {
+      const { error: rpcErr } = await supabaseAdmin
+        .rpc('apply_credit_delta_guarded', { p_user_id: caseOpening.user_id, p_delta: caseOpening.reward_value })
+      if (rpcErr) {
+        console.error('Error adding credits (rpc):', rpcErr)
+        return NextResponse.json({ error: 'Failed to add credits' }, { status: 500 })
+      }
+    }
 
     if (creditError) {
       console.error('Error adding credits:', creditError);

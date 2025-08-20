@@ -82,17 +82,34 @@ async function caseOpeningHandler(request: NextRequest) {
       price: caseData.price
     })
 
-    // Check if user has enough credits
-    if (user.credits < caseData.price) {
+    // Ensure balance row exists and load current balance from balances table
+    const { error: balUpsertErr } = await supabaseAdmin
+      .from('balances')
+      .upsert({ user_id: userId, amount: 0 })
+    if (balUpsertErr && (balUpsertErr as any).code !== '23505') {
+      console.error('❌ Balance init failed:', balUpsertErr)
+      return NextResponse.json({ error: 'Failed to initialize balance' }, { status: 500 })
+    }
+
+    const { data: balanceRow } = await supabaseAdmin
+      .from('balances')
+      .select('amount')
+      .eq('user_id', userId)
+      .single()
+
+    let currentBalance = balanceRow?.amount ?? 0
+
+    // Check if user has enough credits using balances table
+    if (currentBalance < caseData.price) {
       console.log('❌ Insufficient credits:', {
-        userCredits: user.credits,
+        userCredits: currentBalance,
         casePrice: caseData.price,
-        deficit: caseData.price - user.credits
+        deficit: caseData.price - currentBalance
       })
       
       return NextResponse.json({ 
         error: 'Insufficient credits',
-        userCredits: user.credits,
+        userCredits: currentBalance,
         casePrice: caseData.price
       }, { status: 400 });
     }
@@ -259,21 +276,78 @@ async function caseOpeningHandler(request: NextRequest) {
     const isWithdrawable = (selectedSymbol as any).withdrawable === true;
     const isBigReward = selectedSymbol.multiplier >= 5.0;
     let credited = !isWithdrawable; // do not auto-credit withdrawable items
-    let newCredits = credited
-      ? user.credits - caseData.price + winnings
-      : user.credits - caseData.price; // pay case cost only; value awaits NFT mint
 
     // Restore stats calculations
     const newTotalSpent = user.total_spent + caseData.price;
     const newTotalWon = user.total_won + winnings;
     const newCasesOpened = user.cases_opened + 1;
 
-    // Update user record
-    console.log('📝 Updating user record...')
+    // Apply atomic, idempotent credit changes via RPC and event log
+    const idemBase = `open:${caseId}:${userId}:${nonce}`
+
+    // 1) Deduct case price
+    {
+      const deductKey = `${idemBase}:deduct`
+      const { error: eventErr } = await supabaseAdmin
+        .from('credit_events')
+        .insert({ user_id: userId, delta: -caseData.price, reason: 'case_open_deduct', key: deductKey })
+      if (eventErr && (eventErr as any).code !== '23505') {
+        console.error('❌ Failed to record deduction event:', eventErr)
+        return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
+      }
+      if (!eventErr) {
+        const { data: res, error: rpcErr } = await supabaseAdmin
+          .rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: -caseData.price })
+        if (rpcErr) {
+          if (String(rpcErr.message || '').toLowerCase().includes('insufficient')) {
+            return NextResponse.json({ error: 'Insufficient funds' }, { status: 400 })
+          }
+          return NextResponse.json({ error: 'Failed to update balance' }, { status: 500 })
+        }
+        currentBalance = res?.new_amount ?? res?.amount ?? currentBalance - caseData.price
+      } else {
+        // Duplicate key: treat as already deducted; refresh balance
+        const { data: balNow } = await supabaseAdmin
+          .from('balances')
+          .select('amount')
+          .eq('user_id', userId)
+          .single()
+        currentBalance = balNow?.amount ?? currentBalance
+      }
+    }
+
+    // 2) Optionally credit winnings
+    if (credited && winnings > 0) {
+      const winKey = `${idemBase}:win`
+      const { error: eventErr } = await supabaseAdmin
+        .from('credit_events')
+        .insert({ user_id: userId, delta: winnings, reason: 'case_open_win', key: winKey })
+      if (eventErr && (eventErr as any).code !== '23505') {
+        console.error('❌ Failed to record win event:', eventErr)
+        return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
+      }
+      if (!eventErr) {
+        const { data: res, error: rpcErr } = await supabaseAdmin
+          .rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: winnings })
+        if (rpcErr) {
+          return NextResponse.json({ error: 'Failed to apply winnings' }, { status: 500 })
+        }
+        currentBalance = res?.new_amount ?? res?.amount ?? currentBalance + winnings
+      } else {
+        const { data: balNow } = await supabaseAdmin
+          .from('balances')
+          .select('amount')
+          .eq('user_id', userId)
+          .single()
+        currentBalance = balNow?.amount ?? currentBalance
+      }
+    }
+
+    // Update user record (stats only; credits managed in balances table)
+    console.log('📝 Updating user record stats...')
     const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({
-        credits: newCredits,
         total_spent: newTotalSpent,
         total_won: newTotalWon,
         cases_opened: newCasesOpened,
@@ -310,8 +384,8 @@ async function caseOpeningHandler(request: NextRequest) {
         nonce: nonce,
         random_value: randomValue,
         is_pity_activated: isPityActivated,
-        user_balance_before: user.credits,
-        user_balance_after: newCredits,
+        user_balance_before: balanceRow?.amount ?? 0,
+        user_balance_after: currentBalance,
         is_withdrawn: credited ? true : false, // only mark withdrawn for credited path
         withdrawal_type: credited ? 'credits' : null,
         withdrawal_tx_hash: credited ? 'instant_credit' : null,
@@ -343,7 +417,7 @@ async function caseOpeningHandler(request: NextRequest) {
       id: caseOpening.id,
       symbol: selectedSymbol.name,
       winnings: winnings,
-      newBalance: newCredits
+      newBalance: currentBalance
     });
 
     // Check for achievements/milestones
@@ -373,7 +447,7 @@ async function caseOpeningHandler(request: NextRequest) {
       winnings,
       netResult,
       isProfit,
-      newBalance: newCredits,
+      newBalance: currentBalance,
       credited,
       isBigReward,
       caseOpening: {

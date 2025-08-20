@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { signUserToken } from '@/lib/userAuth'
+import { withRateLimit } from '@/lib/rate-limit.js'
 
 // NOTE: Replace this with your real CIP-8 verification implementation
 async function verifySignature(message: string, signature: string, walletAddress: string): Promise<boolean> {
@@ -8,11 +9,26 @@ async function verifySignature(message: string, signature: string, walletAddress
   return Boolean(message) && Boolean(signature) && Boolean(walletAddress)
 }
 
-export async function POST(request: NextRequest) {
+function assertNetworkOrThrow(addr: string) {
+  const raw = process.env.CARDANO_NETWORK || 'Preprod'
+  const isMainnet = /mainnet/i.test(raw)
+  const isTestAddr = addr.startsWith('addr_test1')
+  const isMainAddr = addr.startsWith('addr1') && !isTestAddr
+  if ((isMainnet && isTestAddr) || (!isMainnet && isMainAddr)) {
+    throw new Error('Wallet network mismatch')
+  }
+}
+
+async function handler(request: NextRequest) {
   try {
     if (!supabaseAdmin) return NextResponse.json({ error: 'DB not configured' }, { status: 500 })
     const { walletAddress, signature } = await request.json()
     if (!walletAddress || !signature) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
+
+    // Enforce network consistency
+    try { assertNetworkOrThrow(walletAddress) } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Wallet network mismatch' }, { status: 400 })
+    }
 
     // Load nonce
     const { data: rec, error: nonceErr } = await supabaseAdmin
@@ -59,5 +75,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
   }
 }
+
+export const POST = withRateLimit({ check: async () => ({}) } as any, handler)
 
 

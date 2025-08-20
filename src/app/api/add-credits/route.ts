@@ -218,39 +218,47 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Add credits to user account
-    const oldBalance = user.credits || 0
-    let bonus = 0;
-    // Give welcome bonus if this is the user's first purchase and they haven't claimed it yet
-    if (!user.welcome_bonus_claimed && oldBalance === 0) {
-      bonus = 100;
-    }
-    const newCreditBalance = oldBalance + credits + bonus;
+    // Add credits to user account via guarded RPC on balances table
+    // Ensure balance row exists
+    await supabase.from('balances').upsert({ user_id: user.id, amount: 0 })
 
-    console.log('💰 Updating user balance:', {
+    // Compute bonus eligibility using prior balance from balances
+    const { data: balBefore } = await supabase
+      .from('balances')
+      .select('amount')
+      .eq('user_id', user.id)
+      .single()
+    const oldBalance = balBefore?.amount ?? 0
+    let bonus = 0
+    if (!user.welcome_bonus_claimed && oldBalance === 0) {
+      bonus = 100
+    }
+
+    console.log('💰 Updating user balance via RPC:', {
       userId: user.id,
       oldBalance,
       creditsToAdd: credits,
-      bonus,
-      newBalance: newCreditBalance
+      bonus
     })
 
-    // Update user credits and mark bonus as claimed if given
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ 
-        credits: newCreditBalance,
-        updated_at: new Date().toISOString(),
-        ...(bonus > 0 ? { welcome_bonus_claimed: true } : {})
+    // Idempotency: use txHash to prevent duplicate crediting
+    const idemKey = `purchase:${txHash}`
+    const { error: eventErr } = await supabase
+      .from('credit_events')
+      .insert({ user_id: user.id, delta: credits + bonus, reason: 'credit_purchase', key: idemKey })
+    if (eventErr && (eventErr as any).code !== '23505') {
+      console.error('❌ Failed to record credit event:', eventErr)
+      return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
+    }
+    if (!eventErr) {
+      const { error: rpcErr } = await supabase.rpc('apply_credit_delta_guarded', {
+        p_user_id: user.id,
+        p_delta: credits + bonus
       })
-      .eq('id', user.id)
-
-    if (updateError) {
-      console.error('❌ Credit update error:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update user credits' },
-        { status: 500 }
-      )
+      if (rpcErr) {
+        console.error('❌ Credit RPC error:', rpcErr)
+        return NextResponse.json({ error: 'Failed to apply credits' }, { status: 500 })
+      }
     }
 
     // Record the credit transaction
@@ -271,17 +279,29 @@ export async function POST(request: NextRequest) {
     if (transactionError) {
       console.error('❌ Transaction record error:', transactionError)
       
-      // Try to rollback the credit update
-      await supabase
-        .from('users')
-        .update({ credits: oldBalance })
-        .eq('id', user.id)
+      // Try to rollback the credit via idempotent reversal event
+      const rollbackKey = `${idemKey}:rollback`
+      const { error: rbEventErr } = await supabase
+        .from('credit_events')
+        .insert({ user_id: user.id, delta: -(credits + bonus), reason: 'purchase_rollback', key: rollbackKey })
+      if (!rbEventErr) {
+        await supabase.rpc('apply_credit_delta_guarded', { p_user_id: user.id, p_delta: -(credits + bonus) })
+      }
         
       return NextResponse.json(
         { error: 'Failed to record transaction. Credits have been rolled back.' },
         { status: 500 }
       )
     }
+
+    // Read final balance for response
+    const { data: balAfter } = await supabase
+      .from('balances')
+      .select('amount')
+      .eq('user_id', user.id)
+      .single()
+
+    const newCreditBalance = balAfter?.amount ?? (oldBalance + credits + bonus)
 
     console.log('✅ Credits added successfully:', {
       userId: user.id,

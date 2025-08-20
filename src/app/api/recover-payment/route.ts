@@ -190,24 +190,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Add credits to user balance
-    console.log('💎 Adding credits to user balance...')
-    const newBalance = user.credits + creditsToAdd
+    // Add credits to user balance via guarded RPC + idempotency event
+    console.log('💎 Adding credits to user balance via RPC...')
+    // Ensure balance row exists
+    await supabase.from('balances').upsert({ user_id: user.id, amount: 0 })
 
-    const { data: updatedUser, error: updateError } = await supabase
-      .from('users')
-      .update({ credits: newBalance })
-      .eq('id', user.id)
-      .select()
-      .single()
-
-    if (updateError) {
-      console.error('❌ Failed to update user balance:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update user balance' },
-        { status: 500 }
-      )
+    const idemKey = `recover:${txHash}`
+    const { error: eventErr } = await supabase
+      .from('credit_events')
+      .insert({ user_id: user.id, delta: creditsToAdd, reason: 'payment_recovery', key: idemKey })
+    if (eventErr && (eventErr as any).code !== '23505') {
+      console.error('❌ Failed to record recovery event:', eventErr)
+      return NextResponse.json({ error: 'Failed to record recovery event' }, { status: 500 })
     }
+    if (!eventErr) {
+      const { error: rpcErr } = await supabase
+        .rpc('apply_credit_delta_guarded', { p_user_id: user.id, p_delta: creditsToAdd })
+      if (rpcErr) {
+        console.error('❌ Failed to apply recovered credits:', rpcErr)
+        return NextResponse.json({ error: 'Failed to apply recovered credits' }, { status: 500 })
+      }
+    }
+
+    const { data: balAfter } = await supabase
+      .from('balances')
+      .select('amount')
+      .eq('user_id', user.id)
+      .single()
+    const newBalance = balAfter?.amount ?? (user.credits + creditsToAdd)
 
     console.log('✅ Payment recovery completed successfully!')
 

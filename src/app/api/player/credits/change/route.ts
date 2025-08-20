@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
+import { userRateLimiter } from '@/lib/rate-limit.js'
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,6 +11,13 @@ export async function POST(request: NextRequest) {
     const payload = token ? verifyUserToken(token) : null
     if (!payload) return NextResponse.json({ error: 'Missing or invalid token' }, { status: 401 })
     const userId = payload.userId
+
+    // Rate-limit credit changes per user
+    try {
+      await userRateLimiter.checkUser(userId, 'credit_change')
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Rate limit exceeded' }, { status: 429 })
+    }
 
     const { delta, reason, idempotencyKey } = await request.json()
     if (!Number.isFinite(delta) || !Number.isInteger(delta)) {
