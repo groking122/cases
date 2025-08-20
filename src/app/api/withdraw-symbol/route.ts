@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
+import { applyCredit } from '@/lib/credits/applyCredit'
+import { amountToJSON } from '@/lib/credits/format'
 import crypto from 'crypto';
 
 export async function POST(request: NextRequest) {
@@ -31,6 +33,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database connection not available' }, { status: 500 });
     }
 
+    if (process.env.DISABLE_WRITES === 'true') {
+      return NextResponse.json({ error: 'Temporarily unavailable' }, { status: 503 })
+    }
+
     // Get the case opening item
     const { data: caseOpening, error: fetchError } = await supabaseAdmin
       .from('case_openings')
@@ -59,30 +65,14 @@ export async function POST(request: NextRequest) {
     // Generate transaction hash for the sale
     const txHash = generateTransactionHash();
     
-    // Idempotently credit reward to balances via RPC
-    // Ensure balance row exists
-    await supabaseAdmin.from('balances').upsert({ user_id: caseOpening.user_id, amount: 0 })
-
+    // Idempotently credit reward via single DB function
     const saleKey = `withdraw:symbol:${itemId}`
-    const { error: eventErr } = await supabaseAdmin
-      .from('credit_events')
-      .insert({ user_id: caseOpening.user_id, delta: caseOpening.reward_value, reason: 'symbol_sale', key: saleKey })
-    if (eventErr && (eventErr as any).code !== '23505') {
-      console.error('Error recording credit event:', eventErr)
-      return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
-    }
-    if (!eventErr) {
-      const { error: rpcErr } = await supabaseAdmin
-        .rpc('apply_credit_delta_guarded', { p_user_id: caseOpening.user_id, p_delta: caseOpening.reward_value })
-      if (rpcErr) {
-        console.error('Error adding credits (rpc):', rpcErr)
-        return NextResponse.json({ error: 'Failed to add credits' }, { status: 500 })
-      }
-    }
-
-    if (creditError) {
-      console.error('Error adding credits:', creditError);
-      return NextResponse.json({ error: 'Failed to add credits' }, { status: 500 });
+    let newBalanceBig: bigint
+    try {
+      newBalanceBig = await applyCredit(caseOpening.user_id, BigInt(caseOpening.reward_value), 'symbol_sale', saleKey)
+    } catch (e: any) {
+      console.error('Error adding credits:', e)
+      return NextResponse.json({ error: 'Failed to add credits' }, { status: 500 })
     }
 
     // Mark item as sold
@@ -121,7 +111,8 @@ export async function POST(request: NextRequest) {
       txHash,
       message: `${caseOpening.reward_value} credits added to your balance.`,
       credits_added: caseOpening.reward_value,
-      conversion_rate: 1.0
+      conversion_rate: 1.0,
+      newBalance: amountToJSON(newBalanceBig)
     });
 
   } catch (error) {

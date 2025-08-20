@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 import { withRateLimit, userRateLimiter } from '@/lib/rate-limit.js'
+import { applyCredit } from '@/lib/credits/applyCredit'
+import { amountToJSON } from '@/lib/credits/format'
 
 async function handler(request: NextRequest) {
   try {
+    if (process.env.DISABLE_WRITES === 'true') {
+      return NextResponse.json({ error: 'Temporarily unavailable' }, { status: 503 })
+    }
     // Derive identity from JWT only
     const token = getBearerToken(request.headers.get('authorization'))
     const payload = token ? verifyUserToken(token) : null
@@ -115,37 +120,18 @@ async function handler(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // 💰 DEDUCT CREDITS IMMEDIATELY when request is made via guarded RPC + event
+    // 💰 DEDUCT CREDITS IMMEDIATELY when request is made via single DB function
     const withdrawIdemKey = `withdraw:req:${userId}:${caseOpeningId || 'bulk'}:${creditsToRequest}`
-    // Record idempotency event (ignore duplicate)
-    const { error: withdrawEventErr } = await supabaseAdmin
-      .from('credit_events')
-      .insert({ user_id: userId, delta: -creditsToRequest, reason: 'withdrawal_request', key: withdrawIdemKey })
-    if (withdrawEventErr && (withdrawEventErr as any).code !== '23505') {
-      console.error('Error recording withdrawal event:', withdrawEventErr)
-      return NextResponse.json({ error: 'Failed to record withdrawal event' }, { status: 500 })
-    }
-
-    let newCreditBalance = user.credits
-    if (!withdrawEventErr) {
-      const { data: rpcRes, error: rpcErr } = await supabaseAdmin
-        .rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: -creditsToRequest })
-      if (rpcErr) {
-        if (String(rpcErr.message || '').toLowerCase().includes('insufficient')) {
-          return NextResponse.json({ error: 'Insufficient credits' }, { status: 400 })
-        }
-        console.error('Error deducting credits (rpc):', rpcErr)
-        return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
+    let newCreditBalanceBig: bigint
+    try {
+      newCreditBalanceBig = await applyCredit(userId, -BigInt(creditsToRequest), 'withdrawal_request', withdrawIdemKey)
+    } catch (e: any) {
+      const msg = String(e?.message || '').toLowerCase()
+      if (msg.includes('insufficient')) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 400 })
       }
-      newCreditBalance = rpcRes?.new_amount ?? rpcRes?.amount ?? (user.credits - creditsToRequest)
-    } else {
-      // Duplicate idempotency: read current balance
-      const { data: balNow } = await supabaseAdmin
-        .from('balances')
-        .select('amount')
-        .eq('user_id', userId)
-        .single()
-      newCreditBalance = balNow?.amount ?? user.credits
+      console.error('Error deducting credits:', e)
+      return NextResponse.json({ error: 'Failed to deduct credits' }, { status: 500 })
     }
 
     // Create withdrawal request record with fraud detection data
@@ -177,14 +163,8 @@ async function handler(request: NextRequest) {
       console.error('Error creating withdrawal request:', insertError)
       
       // Rollback credit deduction on error
-      // If creating the withdrawal request failed, attempt to refund credits idempotently
       const refundKey = `${withdrawIdemKey}:refund`
-      const { error: refundEventErr } = await supabaseAdmin
-        .from('credit_events')
-        .insert({ user_id: userId, delta: creditsToRequest, reason: 'withdrawal_request_refund', key: refundKey })
-      if (!refundEventErr) {
-        await supabaseAdmin.rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: creditsToRequest })
-      }
+      await applyCredit(userId, BigInt(creditsToRequest), 'withdrawal_request_refund', refundKey)
         
       return NextResponse.json({ error: 'Failed to create withdrawal request' }, { status: 500 })
     }
@@ -197,7 +177,7 @@ async function handler(request: NextRequest) {
         transaction_type: 'withdrawal_request',
         credits_change: -creditsToRequest,
         credits_before: user.credits,
-        credits_after: newCreditBalance,
+        credits_after: Number(newCreditBalanceBig),
         withdrawal_request_id: withdrawalRequest.id,
         case_opening_id: caseOpeningId,
         description: caseOpening 
@@ -250,7 +230,7 @@ async function handler(request: NextRequest) {
       isSuspicious,
       lifetimePurchased,
       lifetimeWithdrawn,
-      userCreditsAfter: newCreditBalance
+      userCreditsAfter: amountToJSON(newCreditBalanceBig)
     })
 
     return NextResponse.json({
@@ -260,7 +240,7 @@ async function handler(request: NextRequest) {
         : 'Withdrawal request submitted successfully! Credits have been deducted and you will receive confirmation shortly.',
       requestId: withdrawalRequest.id,
       creditsDeducted: creditsToRequest,
-      newCreditBalance: newCreditBalance,
+      newCreditBalance: amountToJSON(newCreditBalanceBig),
       status: withdrawalRequest.status,
       estimatedProcessingTime: isSuspicious ? '24-72 hours (security review)' : '24-48 hours',
       securityInfo: {

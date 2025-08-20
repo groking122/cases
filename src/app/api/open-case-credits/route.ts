@@ -4,6 +4,8 @@ import { withRateLimit, caseOpeningLimiter } from '@/lib/rate-limit.js';
 import { getSecureRandomForCaseOpening, generateServerSeed } from '@/lib/entropy.js';
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 import { getPityConfigForCase } from '@/config/pity';
+import { applyCredit } from '@/lib/credits/applyCredit'
+import { amountToJSON } from '@/lib/credits/format'
 // Removed hardcoded symbols - using database case_symbols instead
 
 async function caseOpeningHandler(request: NextRequest) {
@@ -12,6 +14,10 @@ async function caseOpeningHandler(request: NextRequest) {
     if (!supabaseAdmin) {
       console.error('❌ Database connection not available')
       return NextResponse.json({ error: 'Database connection not available' }, { status: 500 });
+    }
+
+    if (process.env.DISABLE_WRITES === 'true') {
+      return NextResponse.json({ error: 'Temporarily unavailable' }, { status: 503 })
     }
 
     const { caseId, clientSeed } = await request.json();
@@ -82,34 +88,26 @@ async function caseOpeningHandler(request: NextRequest) {
       price: caseData.price
     })
 
-    // Ensure balance row exists and load current balance from balances table
-    const { error: balUpsertErr } = await supabaseAdmin
-      .from('balances')
-      .upsert({ user_id: userId, amount: 0 })
-    if (balUpsertErr && (balUpsertErr as any).code !== '23505') {
-      console.error('❌ Balance init failed:', balUpsertErr)
-      return NextResponse.json({ error: 'Failed to initialize balance' }, { status: 500 })
-    }
-
+    // Load current balance from balances table
     const { data: balanceRow } = await supabaseAdmin
       .from('balances')
       .select('amount')
       .eq('user_id', userId)
       .single()
 
-    let currentBalance = balanceRow?.amount ?? 0
+    let currentBalance = BigInt(String(balanceRow?.amount ?? 0))
 
-    // Check if user has enough credits using balances table
-    if (currentBalance < caseData.price) {
+    // Check if user has enough credits using balances table (fast-fail)
+    if (currentBalance < BigInt(caseData.price)) {
       console.log('❌ Insufficient credits:', {
-        userCredits: currentBalance,
+        userCredits: currentBalance.toString(),
         casePrice: caseData.price,
-        deficit: caseData.price - currentBalance
+        deficit: (BigInt(caseData.price) - currentBalance).toString()
       })
       
       return NextResponse.json({ 
         error: 'Insufficient credits',
-        userCredits: currentBalance,
+        userCredits: amountToJSON(currentBalance),
         casePrice: caseData.price
       }, { status: 400 });
     }
@@ -282,65 +280,14 @@ async function caseOpeningHandler(request: NextRequest) {
     const newTotalWon = user.total_won + winnings;
     const newCasesOpened = user.cases_opened + 1;
 
-    // Apply atomic, idempotent credit changes via RPC and event log
-    const idemBase = `open:${caseId}:${userId}:${nonce}`
-
+    // Apply atomic, idempotent credit changes via single DB function
+    const roundId = `${nonce}`
     // 1) Deduct case price
-    {
-      const deductKey = `${idemBase}:deduct`
-      const { error: eventErr } = await supabaseAdmin
-        .from('credit_events')
-        .insert({ user_id: userId, delta: -caseData.price, reason: 'case_open_deduct', key: deductKey })
-      if (eventErr && (eventErr as any).code !== '23505') {
-        console.error('❌ Failed to record deduction event:', eventErr)
-        return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
-      }
-      if (!eventErr) {
-        const { data: res, error: rpcErr } = await supabaseAdmin
-          .rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: -caseData.price })
-        if (rpcErr) {
-          if (String(rpcErr.message || '').toLowerCase().includes('insufficient')) {
-            return NextResponse.json({ error: 'Insufficient funds' }, { status: 400 })
-          }
-          return NextResponse.json({ error: 'Failed to update balance' }, { status: 500 })
-        }
-        currentBalance = res?.new_amount ?? res?.amount ?? currentBalance - caseData.price
-      } else {
-        // Duplicate key: treat as already deducted; refresh balance
-        const { data: balNow } = await supabaseAdmin
-          .from('balances')
-          .select('amount')
-          .eq('user_id', userId)
-          .single()
-        currentBalance = balNow?.amount ?? currentBalance
-      }
-    }
+    currentBalance = await applyCredit(userId, -BigInt(caseData.price), `bet:case:${caseId}`, `bet:${roundId}`)
 
     // 2) Optionally credit winnings
     if (credited && winnings > 0) {
-      const winKey = `${idemBase}:win`
-      const { error: eventErr } = await supabaseAdmin
-        .from('credit_events')
-        .insert({ user_id: userId, delta: winnings, reason: 'case_open_win', key: winKey })
-      if (eventErr && (eventErr as any).code !== '23505') {
-        console.error('❌ Failed to record win event:', eventErr)
-        return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
-      }
-      if (!eventErr) {
-        const { data: res, error: rpcErr } = await supabaseAdmin
-          .rpc('apply_credit_delta_guarded', { p_user_id: userId, p_delta: winnings })
-        if (rpcErr) {
-          return NextResponse.json({ error: 'Failed to apply winnings' }, { status: 500 })
-        }
-        currentBalance = res?.new_amount ?? res?.amount ?? currentBalance + winnings
-      } else {
-        const { data: balNow } = await supabaseAdmin
-          .from('balances')
-          .select('amount')
-          .eq('user_id', userId)
-          .single()
-        currentBalance = balNow?.amount ?? currentBalance
-      }
+      currentBalance = await applyCredit(userId, BigInt(winnings), `win:case:${caseId}`, `win:${roundId}`)
     }
 
     // Update user record (stats only; credits managed in balances table)
@@ -384,8 +331,8 @@ async function caseOpeningHandler(request: NextRequest) {
         nonce: nonce,
         random_value: randomValue,
         is_pity_activated: isPityActivated,
-        user_balance_before: balanceRow?.amount ?? 0,
-        user_balance_after: currentBalance,
+        user_balance_before: Number(balanceRow?.amount ?? 0),
+        user_balance_after: Number(currentBalance),
         is_withdrawn: credited ? true : false, // only mark withdrawn for credited path
         withdrawal_type: credited ? 'credits' : null,
         withdrawal_tx_hash: credited ? 'instant_credit' : null,
@@ -447,7 +394,7 @@ async function caseOpeningHandler(request: NextRequest) {
       winnings,
       netResult,
       isProfit,
-      newBalance: currentBalance,
+      newBalance: amountToJSON(currentBalance),
       credited,
       isBigReward,
       caseOpening: {
