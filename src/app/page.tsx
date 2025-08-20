@@ -187,7 +187,24 @@ export default function Home() {
     try {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
-      
+
+      // Always fetch ADA balance first so it's not blocked by auth
+      try {
+        console.log('💰 Fetching ADA balance in main page...')
+        const balanceValue = await wallet.getBalance()
+        console.log('💰 Main page balance response:', balanceValue)
+        if (Array.isArray(balanceValue)) {
+          const adaAsset = balanceValue.find(asset => asset.unit === 'lovelace')
+          if (adaAsset) {
+            const newAdaBalance = parseInt(adaAsset.quantity) / 1000000
+            setAdaBalance(newAdaBalance)
+            console.log('💰 ADA balance set in main page:', newAdaBalance)
+          }
+        }
+      } catch (adaError) {
+        console.error('❌ Failed to fetch ADA balance in main page:', adaError)
+      }
+
       // Ensure token exists (perform nonce/verify if needed)
       let token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
       if (!token && walletAddress) {
@@ -217,24 +234,6 @@ export default function Home() {
         const newCredits = data.credits || 0
         setUserCredits({ credits: newCredits, loading: false })
         console.log('💰 Credits fetched:', newCredits)
-      }
-
-      // Fetch ADA balance directly
-      try {
-        console.log('💰 Fetching ADA balance in main page...')
-        const balanceValue = await wallet.getBalance()
-        console.log('💰 Main page balance response:', balanceValue)
-        
-        if (Array.isArray(balanceValue)) {
-          const adaAsset = balanceValue.find(asset => asset.unit === 'lovelace')
-          if (adaAsset) {
-            const newAdaBalance = parseInt(adaAsset.quantity) / 1000000
-            setAdaBalance(newAdaBalance)
-            console.log('💰 ADA balance set in main page:', newAdaBalance)
-          }
-        }
-      } catch (adaError) {
-        console.error('❌ Failed to fetch ADA balance in main page:', adaError)
       }
       
     } catch (error) {

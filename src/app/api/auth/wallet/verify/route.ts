@@ -10,7 +10,7 @@ async function verifySignature(message: string, signature: string, walletAddress
 }
 
 function assertNetworkOrThrow(addr: string) {
-  const raw = process.env.CARDANO_NETWORK || 'Preprod'
+  const raw = process.env.CARDANO_NETWORK || 'Mainnet'
   const isMainnet = /mainnet/i.test(raw)
   const isTestAddr = addr.startsWith('addr_test1')
   const isMainAddr = addr.startsWith('addr1') && !isTestAddr
