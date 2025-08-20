@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { signUserToken } from '@/lib/userAuth'
 import { withRateLimit } from '@/lib/rate-limit.js'
+import { cookies } from 'next/headers'
 
 // NOTE: Replace this with your real CIP-8 verification implementation
 async function verifySignature(message: string, signature: string, walletAddress: string): Promise<boolean> {
@@ -70,6 +71,16 @@ async function handler(request: NextRequest) {
     }
 
     const token = signUserToken({ userId, walletAddress, role: 'user' })
+    // Set httpOnly cookie as fallback for client requests missing Authorization header
+    try {
+      cookies().set('user_token', token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 120 // 2 hours
+      })
+    } catch {}
     return NextResponse.json({ token })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
