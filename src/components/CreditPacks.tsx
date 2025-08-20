@@ -315,7 +315,8 @@ export default function CreditPacks({
         // Update UI immediately with new balance if available
         if (creditResult?.newBalance !== undefined) {
           const nb = typeof creditResult.newBalance === 'string' ? parseInt(creditResult.newBalance) : creditResult.newBalance
-          onCreditsUpdated(nb || pack.credits)
+          if (nb != null) onCreditsUpdated(nb)
+          else onCreditsUpdated(pack.credits)
         }
       }
 

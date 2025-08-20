@@ -231,9 +231,14 @@ export default function Home() {
       
       if (response.ok) {
         const data = await response.json()
-        const newCredits = data.credits || 0
-        setUserCredits({ credits: newCredits, loading: false })
-        console.log('💰 Credits fetched:', newCredits)
+        if (typeof data.credits === 'number') {
+          setUserCredits({ credits: data.credits, loading: false })
+          console.log('💰 Credits fetched:', data.credits)
+        } else {
+          setUserCredits(prev => ({ ...prev, loading: false }))
+        }
+      } else {
+        setUserCredits(prev => ({ ...prev, loading: false }))
       }
       
     } catch (error) {

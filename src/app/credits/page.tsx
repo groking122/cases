@@ -46,8 +46,13 @@ export default function CreditsPage() {
       
       if (response.ok) {
         const data = await response.json()
-        const newCredits = data.credits || 0
-        setUserCredits({ credits: newCredits, loading: false })
+        if (typeof data.credits === 'number') {
+          setUserCredits({ credits: data.credits, loading: false })
+        } else {
+          setUserCredits(prev => ({ ...prev, loading: false }))
+        }
+      } else {
+        setUserCredits(prev => ({ ...prev, loading: false }))
       }
 
       // Fetch ADA balance directly

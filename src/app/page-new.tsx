@@ -142,13 +142,17 @@ export default function Home() {
       
       if (response.ok) {
         const data = await response.json()
-        setUserCredits({ credits: data.credits || 1000, loading: false })
+        if (typeof data.credits === 'number') {
+          setUserCredits({ credits: data.credits, loading: false })
+        } else {
+          setUserCredits(prev => ({ ...prev, loading: false }))
+        }
       } else {
-        setUserCredits({ credits: 1000, loading: false })
+        setUserCredits(prev => ({ ...prev, loading: false }))
       }
     } catch (error) {
       console.error('Error fetching credits:', error)
-      setUserCredits({ credits: 1000, loading: false })
+      setUserCredits(prev => ({ ...prev, loading: false }))
     }
   }
 
