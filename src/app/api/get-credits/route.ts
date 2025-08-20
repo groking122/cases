@@ -22,11 +22,12 @@ async function handler(request: Request) {
       return NextResponse.json({ error: 'Missing or invalid token' }, { status: 401 })
     }
 
-    const { error: upsertErr } = await supabaseAdmin
+    // Initialize balance row only if it doesn't exist; NEVER overwrite existing amount
+    const { error: initErr } = await supabaseAdmin
       .from('balances')
-      .upsert({ user_id: userId, amount: 0 })
-    if (upsertErr && (upsertErr as any).code !== '23505') {
-      console.error('❌ Failed to init balance:', upsertErr)
+      .insert({ user_id: userId, amount: 0 })
+    if (initErr && (initErr as any).code !== '23505') {
+      console.error('❌ Failed to init balance:', initErr)
       return NextResponse.json({ error: 'Failed to initialize balance' }, { status: 500 })
     }
 
