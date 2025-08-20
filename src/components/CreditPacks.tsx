@@ -263,60 +263,60 @@ export default function CreditPacks({
 
       console.log('✅ Payment verified successfully!')
 
-      // Add credits to user account with error handling
+      // Add credits to user account with resilience to pending verification
       console.log('💎 Adding credits to user account...')
-      
-      try {
-        const addCreditsResponse = await fetch('/api/add-credits', {
+
+      const addCreditsOnce = async (): Promise<Response> => {
+        return fetch('/api/add-credits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             txHash,
             credits: pack.credits,
             walletAddress: await wallet.getUsedAddresses(),
-            expectedAmount: priceInLovelace, // Pass the exact amount we used for the transaction
+            expectedAmount: priceInLovelace,
             expectedAddress: paymentAddress
           })
         })
+      }
 
-        if (!addCreditsResponse.ok) {
-          const errorData = await addCreditsResponse.json()
-          console.error('❌ Add credits API error:', errorData)
-          
-          // Handle specific error types
-          if (errorData.error === 'Transaction already processed') {
-            // This means the transaction was already used - possible duplicate
-            console.log('⚠️ Transaction already processed - this might be a duplicate attempt')
-            throw new Error('This transaction has already been processed. Please check your balance or contact support if you believe this is an error.')
-          } else if (errorData.error.includes('verification failed')) {
-            // Payment verification failed
-            throw new Error('Payment verification failed. The transaction may not have been confirmed on the blockchain yet. Please wait a few minutes and contact support if the issue persists.')
-          } else if (errorData.error.includes('Test transactions')) {
-            // Test transaction rejected
-            throw new Error('Test transactions are not allowed. Please make a real ADA payment to purchase credits.')
-          } else if (errorData.error.includes('Invalid transaction hash')) {
-            // Invalid hash format
-            throw new Error('Invalid transaction detected. Please try again with a valid Cardano transaction.')
-          } else {
-            throw new Error(`Failed to add credits: ${errorData.error}`)
-          }
-        }
+      // Poll add-credits if server responds with 202 pending
+      let addRes = await addCreditsOnce()
+      let retries = 0
+      while (addRes.status === 202 && retries < 6) {
+        const waitMs = 3000
+        console.log(`⏳ Credits pending, retrying in ${waitMs}ms (attempt ${retries + 1}/6) ...`)
+        await new Promise(r => setTimeout(r, waitMs))
+        addRes = await addCreditsOnce()
+        retries++
+      }
+
+      if (!addRes.ok) {
+        const errorData = await addRes.json().catch(() => ({} as any))
+        console.error('❌ Add credits API error:', errorData)
         
-        const creditResult = await addCreditsResponse.json()
-        console.log('✅ Credits added successfully!', creditResult)
-      } catch (creditsError: unknown) {
-        console.error('❌ Credits addition failed:', creditsError)
-        
-        // Even if credits failed to add, we should inform user the payment went through
-        const errorMsg = `Payment successful (${txHash.substring(0, 8)}...) but credits may not have been added immediately. Please contact support if your balance doesn't update.`
-        if (onError) {
-          onError(errorMsg)
+        if (errorData?.error === 'Transaction already processed') {
+          console.log('⚠️ Transaction already processed, fetching updated credits...')
+        } else if (addRes.status === 202 || errorData?.status === 'pending') {
+          const pendingMsg = 'Payment received but still indexing. Your credits will appear shortly.'
+          setInlineError(pendingMsg)
+          setPurchasing(null)
+          return
+        } else if (errorData?.error?.includes?.('verification failed')) {
+          throw new Error('Payment verification failed. The transaction may not have confirmed yet. Please wait a minute and try refreshing.')
+        } else if (errorData?.error?.includes?.('Invalid transaction hash')) {
+          throw new Error('Invalid transaction detected. Please try again with a valid Cardano transaction.')
         } else {
-          console.error(errorMsg)
+          throw new Error(`Failed to add credits: ${errorData?.error || `HTTP ${addRes.status}`}`)
         }
-        setInlineError(errorMsg)
-        setPurchasing(null)
-        return
+      } else {
+        const creditResult = await addRes.json()
+        console.log('✅ Credits added successfully!', creditResult)
+        // Update UI immediately with new balance if available
+        if (creditResult?.newBalance !== undefined) {
+          const nb = typeof creditResult.newBalance === 'string' ? parseInt(creditResult.newBalance) : creditResult.newBalance
+          onCreditsUpdated(nb || pack.credits)
+        }
       }
 
       // Success! Get updated credits from user's account
