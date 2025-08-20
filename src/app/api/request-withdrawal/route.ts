@@ -73,6 +73,14 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Load current balance from balances table (authoritative)
+    const { data: balRow } = await supabaseAdmin
+      .from('balances')
+      .select('amount')
+      .eq('user_id', userId)
+      .single()
+    const currentBalance = Number(balRow?.amount ?? 0)
+
     // Get user's lifetime credit purchase and withdrawal totals
     const { data: purchaseTotal } = await supabaseAdmin
       .from('credit_transactions')
@@ -93,9 +101,9 @@ async function handler(request: NextRequest) {
     const creditsToRequest = caseOpening ? caseOpening.reward_value : creditsRequested
 
     // Check if user has enough credits to deduct
-    if (user.credits < creditsToRequest) {
+    if (currentBalance < creditsToRequest) {
       return NextResponse.json({ 
-        error: `Insufficient credits. You have ${user.credits} credits but need ${creditsToRequest} credits to withdraw this item.` 
+        error: `Insufficient credits. You have ${currentBalance} credits but need ${creditsToRequest} credits to withdraw this item.` 
       }, { status: 400 })
     }
 
@@ -176,7 +184,7 @@ async function handler(request: NextRequest) {
         user_id: userId,
         transaction_type: 'withdrawal_request',
         credits_change: -creditsToRequest,
-        credits_before: user.credits,
+        credits_before: currentBalance,
         credits_after: Number(newCreditBalanceBig),
         withdrawal_request_id: withdrawalRequest.id,
         case_opening_id: caseOpeningId,
