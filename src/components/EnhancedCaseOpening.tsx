@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LoadingButton } from '@/components/LoadingButton';
 import toast from 'react-hot-toast';
@@ -100,6 +100,15 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
   const [reward, setReward] = useState<Reward | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const runIdRef = useRef(0)
+  const timeoutsRef = useRef<number[]>([])
+
+  const clearPendingTimeouts = () => {
+    for (const id of timeoutsRef.current) {
+      clearTimeout(id)
+    }
+    timeoutsRef.current = []
+  }
 
   // Detect mobile devices for performance optimization
   useEffect(() => {
@@ -109,7 +118,10 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+      clearPendingTimeouts()
+    };
   }, []);
 
   const handleOpenCase = useCallback(async () => {
@@ -119,9 +131,30 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
       return;
     }
 
-    if (!userId) {
-      toast.error('User not found. Please refresh and reconnect your wallet.');
-      return;
+    // Resolve userId on the fly if missing
+    let effectiveUserId = userId as string | null
+    if (!effectiveUserId) {
+      try {
+        const addresses = await wallet.getUsedAddresses()
+        const walletAddress = addresses?.[0]
+        if (walletAddress) {
+          const userResponse = await fetch('/api/user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ walletAddress, walletType: 'mesh_connected' })
+          })
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            effectiveUserId = userData.user?.id || null
+          }
+        }
+      } catch (e) {
+        console.error('Failed to resolve user automatically:', e)
+      }
+    }
+    if (!effectiveUserId) {
+      toast.error('User not found. Please refresh and reconnect your wallet.')
+      return
     }
 
     if (userCredits < selectedCase.price) {
@@ -129,6 +162,10 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
       return;
     }
 
+    // Start a fresh animation run and cancel any lingering timers
+    clearPendingTimeouts()
+    runIdRef.current += 1
+    const thisRunId = runIdRef.current
     setIsProcessing(true);
     
     try {
@@ -144,7 +181,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: userId,
+          userId: effectiveUserId,
           caseId: selectedCase.id,
           clientSeed: 'user_seed_' + Date.now()
         })
@@ -245,20 +282,25 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                   }
                 })}
                 onComplete={() => {
+                  const myRun = runIdRef.current
                   console.log('🎰 Reel animation completed, transitioning to revealing')
                   
                   // Capture reward value to avoid null reference issues in setTimeout
                   const currentReward = reward;
                   
                   // Stage 4: Revealing the final reward (longer duration)
-                  setTimeout(() => {
+                  const t1 = window.setTimeout(() => {
+                    if (runIdRef.current !== myRun) return
                     console.log('🎰 Setting stage to revealing')
                     setStage('revealing')
                     
                     // After revealing, go to celebration
-                    setTimeout(() => {
+                    const t2 = window.setTimeout(() => {
+                      if (runIdRef.current !== myRun) return
                       console.log('🎰 Setting stage to celebration')
                       setStage('celebration')
+                      // Allow opening another case without waiting the full timeout
+                      setIsProcessing(false)
                       
                       // Ensure reward is still available
                       if (currentReward) {
@@ -284,18 +326,24 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                       }
 
                       // Stage 5: Complete (reset after much longer celebration)
-                      setTimeout(() => {
+                      const t3 = window.setTimeout(() => {
+                        if (runIdRef.current !== myRun) return
                         setStage('complete');
-                        setTimeout(() => {
+                        const t4 = window.setTimeout(() => {
+                          if (runIdRef.current !== myRun) return
                           setStage('idle');
                           setReward(null);
-                          // Re-enable after the full flow completes
+                          // Re-enable after the full flow completes (safety)
                           setIsProcessing(false);
                         }, 2000); // Longer idle transition
+                        timeoutsRef.current.push(t4)
                       }, 5000); // 5 seconds celebration
+                      timeoutsRef.current.push(t3)
                       
                     }, 2000); // 2 seconds for revealing stage
+                    timeoutsRef.current.push(t2)
                   }, 1000) // 1 second before revealing
+                  timeoutsRef.current.push(t1)
                 }}
                 spinDuration={3500}
                 stopDuration={2500}

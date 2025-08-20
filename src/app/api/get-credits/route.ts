@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 
 // Basic validation for wallet addresses - just check it's not empty or demo data
 const isValidWalletAddress = (address: string) => {
@@ -16,7 +17,18 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-        const { walletAddress } = await request.json();
+        // Require JWT identity (player must be authenticated)
+        const authHeader = request.headers.get('authorization')
+        const token = getBearerToken(authHeader)
+        let walletFromToken: string | null = null
+        if (token) {
+            const payload = verifyUserToken(token)
+            if (payload) walletFromToken = payload.walletAddress
+        }
+        if (!walletFromToken) {
+            return NextResponse.json({ error: 'Missing or invalid token' }, { status: 401 })
+        }
+        const walletAddress = walletFromToken
 
         console.log('🔍 Received wallet address:', { 
             address: walletAddress, 

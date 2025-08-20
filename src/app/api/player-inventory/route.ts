@@ -1,30 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 
 export async function POST(request: NextRequest) {
   try {
-    const { walletAddress } = await request.json();
-
-    if (!walletAddress) {
-      return NextResponse.json({ error: 'Wallet address required' }, { status: 400 });
-    }
+    const token = getBearerToken(request.headers.get('authorization'))
+    const payload = token ? verifyUserToken(token) : null
+    if (!payload) return NextResponse.json({ error: 'Missing or invalid token' }, { status: 401 })
+    const userId = payload.userId
 
     if (!supabaseAdmin) {
       return NextResponse.json({ error: 'Database connection not available' }, { status: 500 });
-    }
-
-    // Get user ID from wallet address
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('wallet_address', walletAddress)
-      .single();
-
-    if (userError || !user) {
-      return NextResponse.json({ 
-        inventory: [], 
-        message: 'User not found or no items' 
-      });
     }
 
     // Get all case openings for this user with symbol info
@@ -34,7 +20,7 @@ export async function POST(request: NextRequest) {
     const joinAttempt = await supabaseAdmin
       .from('case_openings')
       .select(`*`)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
     if (!joinAttempt.error) {
       caseOpenings = joinAttempt.data

@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { verifyAdminToken } from '@/lib/adminAuth'
 
 // GET - Fetch all withdrawal requests (admin only)
 export async function GET(request: NextRequest) {
   try {
-    if (!supabaseAdmin) {
-      return NextResponse.json({ error: 'Database connection not available' }, { status: 500 })
+    const auth = await verifyAdminToken(request)
+    if (!auth.success) {
+      return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 })
     }
-
-    // TODO: Add admin authentication check here
-    // const isAdmin = await checkAdminAuth(request)
-    // if (!isAdmin) {
-    //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // }
+    if (!supabaseAdmin) {
+      return NextResponse.json({ success: false, error: 'Database connection not available' }, { status: 500 })
+    }
 
     const { data: requests, error } = await supabaseAdmin
       .from('admin_fraud_detection_dashboard')
@@ -22,14 +21,14 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Database error:', error)
-      return NextResponse.json({ error: 'Failed to fetch withdrawal requests' }, { status: 500 })
+      return NextResponse.json({ success: false, error: 'Failed to fetch withdrawal requests' }, { status: 500 })
     }
 
-    return NextResponse.json({ requests })
+    return NextResponse.json({ success: true, data: requests })
 
   } catch (error) {
     console.error('Error fetching withdrawal requests:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
 

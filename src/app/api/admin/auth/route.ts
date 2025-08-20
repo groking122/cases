@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import { authenticator } from 'otplib'
 import { supabaseAdmin } from '@/lib/supabase'
 import type { AdminUser, AdminApiResponse } from '@/types/admin'
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'your-admin-secret-key'
+const JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'change-me-in-env'
 const JWT_EXPIRES_IN = '24h'
 
 interface LoginRequest {
@@ -275,9 +276,13 @@ async function incrementFailedLoginAttempts(adminId: string) {
 }
 
 async function verifyMfaCode(secret: string, code: string): Promise<boolean> {
-  // Implement TOTP verification (using library like 'speakeasy')
-  // This is a placeholder - implement actual MFA verification
-  return code === '123456' // Temporary for development
+  if (!secret || !code) return false
+  try {
+    // Allow small time drift (default window=1 is usually fine)
+    return authenticator.verify({ token: String(code), secret })
+  } catch {
+    return false
+  }
 }
 
 async function logAdminAction(action: {

@@ -18,7 +18,7 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'withdrawals'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'withdrawals' | 'account'>('dashboard')
   const [stats, setStats] = useState<AdminDashboardStats | null>(null)
   const [cases, setCases] = useState<CaseConfig[]>([])
   const [symbols, setSymbols] = useState<Symbol[]>([])
@@ -112,7 +112,8 @@ export default function AdminDashboard() {
     { id: 'cases', label: 'Cases', icon: '📦' },
     { id: 'symbols', label: 'Symbols', icon: '💎' },
     { id: 'withdrawals', label: 'Withdrawals', icon: '💸' },
-    { id: 'analytics', label: 'Analytics', icon: '📈' }
+    { id: 'analytics', label: 'Analytics', icon: '📈' },
+    { id: 'account', label: 'Account', icon: '🔐' }
   ] as const
 
   if (isLoading) {
@@ -124,19 +125,19 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+      <header className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold">🎰 Case Opening Admin</h1>
           <div className="flex items-center space-x-4">
-            <span className="text-gray-400">Welcome, Admin</span>
+            <span className="text-foreground/70">Welcome, Admin</span>
             <button 
               onClick={() => {
                 localStorage.removeItem('adminToken')
                 window.location.href = '/admin/login'
               }}
-              className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg text-sm"
+              className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 px-4 py-2 rounded-lg text-sm text-white"
             >
               Logout
             </button>
@@ -145,7 +146,7 @@ export default function AdminDashboard() {
       </header>
 
       {/* Navigation */}
-      <nav className="bg-gray-800 border-b border-gray-700 px-6">
+      <nav className="bg-card border-b border-border px-6">
         <div className="flex space-x-8">
           {tabs.map(tab => (
             <button
@@ -153,8 +154,8 @@ export default function AdminDashboard() {
               onClick={() => setActiveTab(tab.id)}
               className={`py-4 px-2 border-b-2 transition-colors duration-200 ${
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-white hover:border-gray-600'
+                  ? 'border-orange-500 text-orange-400'
+                  : 'border-transparent text-foreground/60 hover:text-foreground hover:border-border'
               }`}
             >
               <span className="mr-2">{tab.icon}</span>
@@ -173,7 +174,7 @@ export default function AdminDashboard() {
           transition={{ duration: 0.3 }}
         >
           {activeTab === 'dashboard' && (
-            <DashboardOverview stats={stats} />
+            <DashboardOverview stats={stats} onRefresh={loadDashboardData} />
           )}
 
           {activeTab === 'cases' && (
@@ -336,6 +337,10 @@ export default function AdminDashboard() {
               onDateRangeChange={(range) => console.log('Date range changed:', range)}
             />
           )}
+
+          {activeTab === 'account' && (
+            <AccountSecurity />
+          )}
         </motion.div>
       </main>
 
@@ -413,7 +418,7 @@ export default function AdminDashboard() {
 }
 
 // Dashboard Overview Component
-function DashboardOverview({ stats }: { stats: AdminDashboardStats | null }) {
+function DashboardOverview({ stats, onRefresh }: { stats: AdminDashboardStats | null; onRefresh: () => void }) {
   if (!stats) return <div>Loading stats...</div>
 
   const statCards = [
@@ -427,7 +432,10 @@ function DashboardOverview({ stats }: { stats: AdminDashboardStats | null }) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Dashboard Overview</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold">Dashboard Overview</h2>
+        <button onClick={onRefresh} className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white px-4 py-2 rounded-lg">Refresh</button>
+      </div>
       
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -579,7 +587,12 @@ function CasesList({
                     Edit
                   </button>
                   <button
-                    onClick={() => onDeleteCase(caseItem.id)}
+                    onClick={async () => {
+                      if (!confirm('Delete this case?')) return
+                      const confirmed = prompt('Type DELETE to confirm:') === 'DELETE'
+                      if (!confirmed) return
+                      onDeleteCase(caseItem.id)
+                    }}
                     className="text-red-400 hover:text-red-300"
                   >
                     Delete
@@ -589,6 +602,48 @@ function CasesList({
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// Account security settings
+function AccountSecurity() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [mfa, setMfa] = useState(false)
+
+  const save = async () => {
+    const res = await fetch('/api/admin/account', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+      body: JSON.stringify({ email: email || undefined, password: password || undefined, mfaEnabled: mfa })
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.success) {
+      alert(data.error || 'Failed to update account')
+    } else {
+      alert('Account updated')
+      setPassword('')
+    }
+  }
+
+  return (
+    <div className="max-w-md bg-card border border-border rounded-xl p-6">
+      <h3 className="text-lg font-semibold mb-4">Account Security</h3>
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">New Email</label>
+          <input className="w-full bg-background border border-border rounded-lg px-3 py-2" value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@domain.com" />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">New Password</label>
+          <input type="password" className="w-full bg-background border border-border rounded-lg px-3 py-2" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" />
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={mfa} onChange={e=>setMfa(e.target.checked)} /> Enable MFA (TOTP)
+        </label>
+        <button onClick={save} className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white px-4 py-2 rounded-lg">Save</button>
       </div>
     </div>
   )

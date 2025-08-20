@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 
 export async function POST(request: NextRequest) {
   try {
+    // Derive identity from JWT only
+    const token = getBearerToken(request.headers.get('authorization'))
+    const payload = token ? verifyUserToken(token) : null
+    const userId = payload?.userId
+
     const { 
-      userId, 
       caseOpeningId, 
       withdrawalType, 
       paymentMethod, 
@@ -14,7 +19,7 @@ export async function POST(request: NextRequest) {
     } = await request.json()
 
     if (!userId || !withdrawalType) {
-      return NextResponse.json({ error: 'Missing required fields: userId and withdrawalType are required' }, { status: 400 })
+      return NextResponse.json({ error: 'Missing required fields: token and withdrawalType are required' }, { status: 400 })
     }
 
     // For bulk credit withdrawals, creditsRequested is required when caseOpeningId is null

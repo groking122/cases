@@ -47,10 +47,11 @@ export async function GET(request: NextRequest) {
     let totalRevenue = 0
     
     try {
+      // Count using created_at (the insert uses created_at by default)
       const { count: todayCount } = await supabase
         .from('case_openings')
         .select('*', { count: 'exact', head: true })
-        .gte('opened_at', todayISO)
+        .gte('created_at', todayISO)
 
       todayOpenings = todayCount || 0
     } catch (error) {

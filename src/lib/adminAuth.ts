@@ -30,11 +30,11 @@ export async function verifyAdminToken(
   requiredPermissions?: AdminPermission[]
 ): Promise<AuthResult> {
   try {
-    // DEVELOPMENT BYPASS - Remove this in production!
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔓 Development mode: Bypassing admin authentication')
-      return { 
-        success: true, 
+    // Optional development bypass (disabled by default)
+    if (process.env.ADMIN_DEV_BYPASS === 'true') {
+      console.warn('⚠️ ADMIN_DEV_BYPASS enabled: Bypassing admin authentication')
+      return {
+        success: true,
         user: {
           userId: 'dev-admin',
           email: 'admin@dev.local',
