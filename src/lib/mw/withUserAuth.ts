@@ -1,5 +1,4 @@
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
-import { cookies } from 'next/headers'
 
 export function withUserAuth<T extends (request: Request, ...args: any[]) => any>(handler: T) {
   return async function wrapped(request: any, ...rest: any[]) {
@@ -7,8 +6,19 @@ export function withUserAuth<T extends (request: Request, ...args: any[]) => any
     const headerToken = getBearerToken(hdrAuth)
     let token = headerToken
     if (!token) {
+      // Fallback: read cookie from request headers for broad Next.js compatibility
       try {
-        token = cookies().get('user_token')?.value || null
+        const cookieHeader = request.headers?.get?.('cookie') || request.headers?.cookie || ''
+        if (cookieHeader && typeof cookieHeader === 'string') {
+          const parts = cookieHeader.split(';')
+          for (const part of parts) {
+            const [k, ...restVal] = part.trim().split('=')
+            if (k === 'user_token') {
+              token = decodeURIComponent(restVal.join('='))
+              break
+            }
+          }
+        }
       } catch {
         token = null
       }
