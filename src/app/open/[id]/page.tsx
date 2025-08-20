@@ -60,11 +60,7 @@ export default function OpenCasePage() {
       try {
         const addresses = await wallet.getUsedAddresses()
         const walletAddress = addresses[0]
-        const res = await fetch('/api/get-credits', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ walletAddress })
-        })
+        const res = await fetch('/api/get-credits', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` } })
         const data = await res.json()
         if (res.ok) setUserCredits(data.credits || 0)
       } catch {}

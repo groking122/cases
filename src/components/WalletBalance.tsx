@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { authFetch } from '@/lib/authFetch'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWallet } from '@meshsdk/react'
 
@@ -80,11 +81,7 @@ export default function WalletBalance({
         return 0
       }
       
-      const response = await fetch('/api/get-credits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress })
-      })
+      const response = await authFetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()

@@ -42,13 +42,9 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
     if (!connected || !wallet) return
 
     try {
-      const addresses = await wallet.getUsedAddresses()
-      const walletAddress = addresses[0]
-
       const response = await fetch('/api/get-credits', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress })
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` }
       })
 
       if (response.ok) {
@@ -111,13 +107,6 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
     setWithdrawalSubmitting(true)
 
     try {
-      const userId = await resolveUserId()
-      if (!userId) {
-        alert('Unable to verify user. Please reconnect your wallet and try again.')
-        setWithdrawalSubmitting(false)
-        return
-      }
-
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
       
@@ -136,9 +125,8 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
 
       const response = await fetch('/api/request-withdrawal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
         body: JSON.stringify({
-          userId,
           caseOpeningId: null, // No specific case opening for bulk credit withdrawal
           withdrawalType: 'ada',
           paymentMethod: 'ada_transfer',

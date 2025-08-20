@@ -326,8 +326,7 @@ export default function CreditPacks({
       try {
         const creditsResponse = await fetch('/api/get-credits', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ walletAddress })
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` }
         })
         
         if (creditsResponse.ok) {

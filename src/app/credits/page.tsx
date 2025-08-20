@@ -36,11 +36,10 @@ export default function CreditsPage() {
       const walletAddress = addresses[0]
       setWalletAddress(walletAddress)
       
-      // Fetch credits
+      // Fetch credits (JWT auth)
       const response = await fetch('/api/get-credits', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress })
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` },
       })
       
       if (response.ok) {
