@@ -27,42 +27,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'idempotencyKey must be string' }, { status: 400 })
     }
 
-    // Create balance row if missing
-    const { error: upsertErr } = await supabaseAdmin
-      .from('balances')
-      .upsert({ user_id: userId, amount: 0 })
-    if (upsertErr && upsertErr.code !== '23505') { // ignore unique violation
-      return NextResponse.json({ error: 'Failed to init balance' }, { status: 500 })
-    }
-
-    // Optional idempotency enforcement
-    if (idempotencyKey) {
-      const { error: idemErr } = await supabaseAdmin
-        .from('credit_events')
-        .insert({ user_id: userId, delta, reason: (reason || '').slice(0, 128), key: idempotencyKey })
-      if (idemErr) {
-        // If duplicate key, treat as success and return current balance
-        if ((idemErr as any).code === '23505') {
-          const { data: bal } = await supabaseAdmin.from('balances').select('amount').eq('user_id', userId).single()
-          return NextResponse.json({ balance: bal?.amount ?? 0 })
-        }
-        return NextResponse.json({ error: 'Failed to record event' }, { status: 500 })
-      }
-    }
-
-    // Atomic guarded update to prevent negatives
-    const { data: result, error: updateErr } = await supabaseAdmin.rpc('apply_credit_delta_guarded', {
+    // Single syscall: atomic, idempotent, audited
+    const { data, error } = await supabaseAdmin.rpc('credit_apply_and_log', {
       p_user_id: userId,
-      p_delta: delta
+      p_delta: delta,
+      p_reason: (reason || '').slice(0, 128),
+      p_key: idempotencyKey || null
     })
-    if (updateErr) {
-      if (String(updateErr.message || '').toLowerCase().includes('insufficient')) {
+    if (error) {
+      if (String(error.message || '').toLowerCase().includes('insufficient')) {
         return NextResponse.json({ error: 'Insufficient funds' }, { status: 400 })
       }
       return NextResponse.json({ error: 'Failed to update balance' }, { status: 500 })
     }
 
-    return NextResponse.json({ balance: result?.new_amount ?? result?.amount ?? 0 })
+    // data is BIGINT; return as number fallback
+    const balance = (data as any) ?? 0
+    return NextResponse.json({ balance })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
   }
