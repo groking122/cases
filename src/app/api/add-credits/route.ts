@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { applyCredit } from '@/lib/credits/applyCredit'
+import { amountToJSON } from '@/lib/credits/format'
 
 // Check environment variables
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,6 +21,9 @@ const supabase = supabaseUrl && supabaseServiceKey
 
 export async function POST(request: NextRequest) {
   try {
+    if (process.env.DISABLE_WRITES === 'true') {
+      return NextResponse.json({ error: 'Temporarily unavailable' }, { status: 503 })
+    }
     // Check if Supabase is configured
     if (!supabase) {
       console.error('❌ Supabase not configured - missing environment variables')
@@ -218,48 +223,19 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Add credits to user account via guarded RPC on balances table
-    // Ensure balance row exists
-    await supabase.from('balances').upsert({ user_id: user.id, amount: 0 })
-
-    // Compute bonus eligibility using prior balance from balances
+    // Compute bonus eligibility and apply credits via single DB function with idempotency
+    // Read starting balance for bonus logic
     const { data: balBefore } = await supabase
       .from('balances')
       .select('amount')
       .eq('user_id', user.id)
       .single()
-    const oldBalance = balBefore?.amount ?? 0
-    let bonus = 0
-    if (!user.welcome_bonus_claimed && oldBalance === 0) {
-      bonus = 100
-    }
+    const oldBalance = BigInt(String(balBefore?.amount ?? 0))
+    const base = BigInt(credits)
+    const bonus = (!user.welcome_bonus_claimed && oldBalance === 0n) ? 100n : 0n
 
-    console.log('💰 Updating user balance via RPC:', {
-      userId: user.id,
-      oldBalance,
-      creditsToAdd: credits,
-      bonus
-    })
-
-    // Idempotency: use txHash to prevent duplicate crediting
     const idemKey = `purchase:${txHash}`
-    const { error: eventErr } = await supabase
-      .from('credit_events')
-      .insert({ user_id: user.id, delta: credits + bonus, reason: 'credit_purchase', key: idemKey })
-    if (eventErr && (eventErr as any).code !== '23505') {
-      console.error('❌ Failed to record credit event:', eventErr)
-      return NextResponse.json({ error: 'Failed to record credit event' }, { status: 500 })
-    }
-    if (!eventErr) {
-      const { error: rpcErr } = await supabase.rpc('apply_credit_delta_guarded', {
-        p_user_id: user.id,
-        p_delta: credits + bonus
-      })
-      if (rpcErr) {
-        console.error('❌ Credit RPC error:', rpcErr)
-        return NextResponse.json({ error: 'Failed to apply credits' }, { status: 500 })
-      }
-    }
+    const newBalance = await applyCredit(user.id, base + bonus, 'credit_purchase', idemKey)
 
     // Record the credit transaction
     console.log('📝 Recording transaction...')
@@ -281,12 +257,8 @@ export async function POST(request: NextRequest) {
       
       // Try to rollback the credit via idempotent reversal event
       const rollbackKey = `${idemKey}:rollback`
-      const { error: rbEventErr } = await supabase
-        .from('credit_events')
-        .insert({ user_id: user.id, delta: -(credits + bonus), reason: 'purchase_rollback', key: rollbackKey })
-      if (!rbEventErr) {
-        await supabase.rpc('apply_credit_delta_guarded', { p_user_id: user.id, p_delta: -(credits + bonus) })
-      }
+      const rollbackDelta = -(base + bonus)
+      await applyCredit(user.id, rollbackDelta, 'purchase_rollback', rollbackKey)
         
       return NextResponse.json(
         { error: 'Failed to record transaction. Credits have been rolled back.' },
@@ -294,28 +266,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Read final balance for response
-    const { data: balAfter } = await supabase
-      .from('balances')
-      .select('amount')
-      .eq('user_id', user.id)
-      .single()
-
-    const newCreditBalance = balAfter?.amount ?? (oldBalance + credits + bonus)
-
     console.log('✅ Credits added successfully:', {
       userId: user.id,
       transactionId: transactionRecord.id,
-      creditsAdded: credits,
-      newBalance: newCreditBalance,
+      creditsAdded: Number(base),
+      newBalance: newBalance.toString(),
       txHash: txHash.substring(0, 16) + '...'
     })
 
     return NextResponse.json({
       success: true,
-      newBalance: newCreditBalance,
-      creditsAdded: credits,
-      oldBalance: oldBalance,
+      newBalance: amountToJSON(newBalance),
+      creditsAdded: Number(base),
+      oldBalance: amountToJSON(oldBalance),
       transactionId: transactionRecord.id,
       message: `${credits} credits added successfully!`
     })

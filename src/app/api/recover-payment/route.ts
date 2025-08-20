@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { applyCredit } from '@/lib/credits/applyCredit'
+import { amountToJSON } from '@/lib/credits/format'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -18,6 +20,10 @@ const supabase = supabaseUrl && supabaseServiceKey
 
 export async function POST(request: NextRequest) {
   try {
+    if (process.env.DISABLE_WRITES === 'true') {
+      return NextResponse.json({ error: 'Temporarily unavailable' }, { status: 503 })
+    }
+
     // Check if Supabase is configured
     if (!supabase) {
       console.error('❌ Supabase not configured - missing environment variables')
@@ -135,7 +141,7 @@ export async function POST(request: NextRequest) {
       console.log('🆕 Creating new user...')
       const { data: newUser, error: createError } = await supabase
         .from('users')
-        .insert([{
+        .insert([{\
           wallet_address: walletAddress,
           username: walletAddress.substring(0, 12) + '...',
           credits: 0
@@ -190,34 +196,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Add credits to user balance via guarded RPC + idempotency event
-    console.log('💎 Adding credits to user balance via RPC...')
-    // Ensure balance row exists
-    await supabase.from('balances').upsert({ user_id: user.id, amount: 0 })
-
-    const idemKey = `recover:${txHash}`
-    const { error: eventErr } = await supabase
-      .from('credit_events')
-      .insert({ user_id: user.id, delta: creditsToAdd, reason: 'payment_recovery', key: idemKey })
-    if (eventErr && (eventErr as any).code !== '23505') {
-      console.error('❌ Failed to record recovery event:', eventErr)
-      return NextResponse.json({ error: 'Failed to record recovery event' }, { status: 500 })
-    }
-    if (!eventErr) {
-      const { error: rpcErr } = await supabase
-        .rpc('apply_credit_delta_guarded', { p_user_id: user.id, p_delta: creditsToAdd })
-      if (rpcErr) {
-        console.error('❌ Failed to apply recovered credits:', rpcErr)
-        return NextResponse.json({ error: 'Failed to apply recovered credits' }, { status: 500 })
-      }
-    }
-
-    const { data: balAfter } = await supabase
-      .from('balances')
-      .select('amount')
-      .eq('user_id', user.id)
-      .single()
-    const newBalance = balAfter?.amount ?? (user.credits + creditsToAdd)
+    // Apply credits via single DB function (idempotent)
+    const newBalance = await applyCredit(user.id, BigInt(creditsToAdd), 'payment_recovery', `recover:${txHash}`)
 
     console.log('✅ Payment recovery completed successfully!')
 
@@ -227,7 +207,7 @@ export async function POST(request: NextRequest) {
       details: {
         txHash: txHash.substring(0, 16) + '...',
         creditsAdded: creditsToAdd,
-        newBalance: newBalance,
+        newBalance: amountToJSON(newBalance),
         blockfrostVerification: blockfrostVerification?.success ? 'verified' : 'failed',
         message: `Successfully recovered ${creditsToAdd} credits for transaction ${txHash.substring(0, 16)}...`
       }
