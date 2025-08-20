@@ -97,7 +97,8 @@ export default function WalletBalance({
     } catch (error) {
       console.error('Failed to fetch credits:', error)
     }
-    return 0
+    // Do not clobber a known balance with 0 on failures
+    return previousCredits.current || 0
   }, [connected, externalWalletAddress]) // Removed wallet dependency to prevent recreation
 
   // Instant credit update (called externally)
@@ -178,7 +179,8 @@ export default function WalletBalance({
       }
 
       // Get credits with animation
-      const credits = showCredits ? await fetchCredits(showCreditAnimation) : 0
+      const fetchedCredits = showCredits ? await fetchCredits(showCreditAnimation) : 0
+      const credits = fetchedCredits === 0 && previousCredits.current > 0 ? previousCredits.current : fetchedCredits
 
       console.log('💰 Final balances - ADA:', adaBalance, 'Credits:', credits)
 
@@ -194,7 +196,7 @@ export default function WalletBalance({
         }
         
         return {
-          ada: adaBalance,
+          ada: (adaBalance === 0 && prev.ada > 0) ? prev.ada : adaBalance,
           token: 0,
           credits,
           loading: false,
