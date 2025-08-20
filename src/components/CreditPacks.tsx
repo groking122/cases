@@ -226,7 +226,7 @@ export default function CreditPacks({
       // Verify payment on backend with retry logic
       let verificationResponse: Response
       let retryCount = 0
-      const maxRetries = 3
+      const maxRetries = 5
       
       while (retryCount < maxRetries) {
         try {
@@ -242,7 +242,7 @@ export default function CreditPacks({
           
           if (verificationResponse.ok) {
             break
-          } else if (verificationResponse.status === 404 && retryCount < maxRetries - 1) {
+          } else if ((verificationResponse.status === 404 || verificationResponse.status === 503) && retryCount < maxRetries - 1) {
             // Transaction might not be confirmed yet, wait and retry
             console.log(`🕒 Transaction not confirmed yet, retrying in ${2 ** retryCount} seconds...`)
             await new Promise(resolve => setTimeout(resolve, (2 ** retryCount) * 1000))

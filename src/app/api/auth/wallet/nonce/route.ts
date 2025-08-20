@@ -26,9 +26,11 @@ async function handler(request: NextRequest) {
       return NextResponse.json({ error: 'walletAddress required' }, { status: 400 })
     }
 
-    // Enforce network consistency
-    try { assertNetworkOrThrow(walletAddress) } catch (e: any) {
-      return NextResponse.json({ error: e?.message || 'Wallet network mismatch' }, { status: 400 })
+    // Enforce network consistency only if explicitly enabled
+    if (process.env.ENFORCE_WALLET_NETWORK === 'true') {
+      try { assertNetworkOrThrow(walletAddress) } catch (e: any) {
+        return NextResponse.json({ error: e?.message || 'Wallet network mismatch' }, { status: 400 })
+      }
     }
 
     const nonce = generateNonce()

@@ -25,9 +25,11 @@ async function handler(request: NextRequest) {
     const { walletAddress, signature } = await request.json()
     if (!walletAddress || !signature) return NextResponse.json({ error: 'missing fields' }, { status: 400 })
 
-    // Enforce network consistency
-    try { assertNetworkOrThrow(walletAddress) } catch (e: any) {
-      return NextResponse.json({ error: e?.message || 'Wallet network mismatch' }, { status: 400 })
+    // Enforce network consistency only if explicitly enabled
+    if (process.env.ENFORCE_WALLET_NETWORK === 'true') {
+      try { assertNetworkOrThrow(walletAddress) } catch (e: any) {
+        return NextResponse.json({ error: e?.message || 'Wallet network mismatch' }, { status: 400 })
+      }
     }
 
     // Load nonce
