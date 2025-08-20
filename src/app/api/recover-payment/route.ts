@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       console.log('🆕 Creating new user...')
       const { data: newUser, error: createError } = await supabase
         .from('users')
-        .insert([{\
+        .insert([{
           wallet_address: walletAddress,
           username: walletAddress.substring(0, 12) + '...',
           credits: 0
