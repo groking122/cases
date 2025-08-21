@@ -11,6 +11,7 @@ import { PrizeRevealModal } from "@/components/PrizeRevealModal"
 import { useWallet } from '@meshsdk/react'
 import PlayerInventory from "@/components/PlayerInventory"
 import { AssetPreloader, AssetPreloaderDebug } from "@/components/AssetPreloader"
+import { authFetch } from '@/lib/authFetch'
 
 interface Skin {
   id: string
@@ -138,7 +139,7 @@ export default function Home() {
         setUserCredits(prev => ({ ...prev, loading: false }))
         return
       }
-      const response = await fetch('/api/get-credits', { method: 'POST' })
+      const response = await authFetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()

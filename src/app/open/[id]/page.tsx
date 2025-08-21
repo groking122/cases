@@ -9,6 +9,7 @@ import { EnhancedCaseOpening } from '@/components/EnhancedCaseOpening'
 import WalletSelector from '@/components/WalletSelector'
 import ThemeToggle from '@/components/ThemeToggle'
 import RulesPopup from '@/components/RulesPopup'
+import { authFetch } from '@/lib/authFetch'
 
 export default function OpenCasePage() {
   const params = useParams<{ id: string }>()
@@ -62,7 +63,7 @@ export default function OpenCasePage() {
         const walletAddress = addresses[0]
         const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
         if (!token) return
-        const res = await fetch('/api/get-credits', { method: 'POST' })
+        const res = await authFetch('/api/get-credits', { method: 'POST' })
         const data = await res.json()
         if (res.ok) setUserCredits(data.credits || 0)
       } catch {}

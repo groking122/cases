@@ -18,6 +18,7 @@ import { SYMBOL_CONFIG } from "@/lib/symbols"
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
 import RulesPopup from '@/components/RulesPopup'
+import { authFetch } from '@/lib/authFetch'
 
 
 interface Skin {
@@ -227,7 +228,7 @@ export default function Home() {
         setUserCredits(prev => ({ ...prev, loading: false }))
         return 0
       }
-      const response = await fetch('/api/get-credits', { method: 'POST' })
+      const response = await authFetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()

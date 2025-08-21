@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useWallet } from '@meshsdk/react'
+import { authFetch } from '@/lib/authFetch'
 
 interface InventoryItem {
   id: string
@@ -44,7 +45,7 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
       if (!token) return
-      const response = await fetch('/api/get-credits', { method: 'POST' })
+      const response = await authFetch('/api/get-credits', { method: 'POST' })
 
       if (response.ok) {
         const data = await response.json()

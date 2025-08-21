@@ -10,6 +10,7 @@ import WalletBalance from "@/components/WalletBalance"
 import CreditPacks from "@/components/CreditPacks"
 import WalletSelector from "@/components/WalletSelector"
 import ThemeToggle from "@/components/ThemeToggle"
+import { authFetch } from '@/lib/authFetch'
 
 interface UserCredits {
   credits: number
@@ -37,12 +38,28 @@ export default function CreditsPage() {
       setWalletAddress(walletAddress)
       
       // Fetch credits (JWT auth) - uses cookie fallback via server
-      const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      // Ensure token exists (perform nonce/verify if needed)
+      let token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      if (!token && walletAddress) {
+        try {
+          const nonceRes = await fetch('/api/auth/wallet/nonce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ walletAddress }) })
+          const nonceData = await nonceRes.json()
+          if (nonceRes.ok && nonceData?.nonce) {
+            const verifyRes = await fetch('/api/auth/wallet/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ walletAddress, signature: nonceData.nonce }) })
+            const verifyData = await verifyRes.json()
+            if (verifyRes.ok && verifyData?.token) {
+              localStorage.setItem('userToken', verifyData.token)
+              try { window.dispatchEvent(new Event('user-token-set')) } catch {}
+              token = verifyData.token
+            }
+          }
+        } catch {}
+      }
       if (!token) {
         setUserCredits(prev => ({ ...prev, loading: false }))
         return
       }
-      const response = await fetch('/api/get-credits', { method: 'POST' })
+      const response = await authFetch('/api/get-credits', { method: 'POST' })
       
       if (response.ok) {
         const data = await response.json()

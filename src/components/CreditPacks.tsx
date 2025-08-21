@@ -325,7 +325,7 @@ export default function CreditPacks({
       // Optional: background refresh without overwriting current value on failure
       ;(async () => {
         try {
-          const res = await fetch('/api/get-credits', { method: 'POST' })
+          const res = await fetch('/api/get-credits', { method: 'POST', headers: { 'Authorization': `Bearer ${localStorage.getItem('userToken') || ''}` } })
           if (!res.ok) return
           const data = await res.json()
           if (typeof data?.credits === 'number' && data.credits >= 0) {
