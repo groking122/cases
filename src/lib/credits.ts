@@ -11,7 +11,7 @@ function getClient() {
 export async function getUserBalances(userId: string) {
   const sb = getClient()
   const { data, error } = await sb
-    .from('user_balances')
+    .from('balances')
     .select('purchased_credits,winnings_credits,bonus_credits,last_purchase_at')
     .eq('user_id', userId)
     .single()
@@ -28,7 +28,7 @@ export async function getUserBalances(userId: string) {
 export async function decrementWithdrawable(userId: string, credits: number) {
   const sb = getClient()
   const { data: bal, error: balErr } = await sb
-    .from('user_balances')
+    .from('balances')
     .select('purchased_credits,winnings_credits')
     .eq('user_id', userId)
     .single()
@@ -40,10 +40,10 @@ export async function decrementWithdrawable(userId: string, credits: number) {
   if (remaining > bal.purchased_credits) throw new Error('not enough withdrawable credits')
   const fromPurchased = remaining
 
+  const total = fromWinnings + fromPurchased
   const { error } = await sb.rpc('apply_withdraw_delta', {
     p_user_id: userId,
-    p_winnings_delta: -fromWinnings,
-    p_purchased_delta: -fromPurchased
+    p_total_credits: total
   })
   if (error) throw new Error(error.message)
 }

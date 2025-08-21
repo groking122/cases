@@ -301,15 +301,15 @@ export async function POST(request: NextRequest) {
 
     // Update aggregate withdraw buckets (best-effort; skip if table missing). No cooldown/turnover.
     try {
-      // Ensure user_balances row exists
+      // Ensure balances row exists
       const { data: ub } = await supabase
-        .from('user_balances')
+        .from('balances')
         .select('purchased_credits')
         .eq('user_id', user.id)
         .single()
       if (!ub) {
         await supabase
-          .from('user_balances')
+          .from('balances')
           .insert({
             user_id: user.id,
             purchased_credits: credits,
@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
           })
       } else {
         await supabase
-          .from('user_balances')
+          .from('balances')
           .update({
             purchased_credits: (ub.purchased_credits || 0) + credits
           })
