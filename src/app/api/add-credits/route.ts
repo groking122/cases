@@ -299,6 +299,45 @@ export async function POST(request: NextRequest) {
       txHash: txHash.substring(0, 16) + '...'
     })
 
+    // Update aggregate withdraw buckets (best-effort; skip if table missing). No cooldown/turnover.
+    try {
+      // Ensure user_balances row exists
+      const { data: ub } = await supabase
+        .from('user_balances')
+        .select('purchased_credits')
+        .eq('user_id', user.id)
+        .single()
+      if (!ub) {
+        await supabase
+          .from('user_balances')
+          .insert({
+            user_id: user.id,
+            purchased_credits: credits,
+            winnings_credits: 0,
+            bonus_credits: 0,
+            last_purchase_at: null
+          })
+      } else {
+        await supabase
+          .from('user_balances')
+          .update({
+            purchased_credits: (ub.purchased_credits || 0) + credits
+          })
+          .eq('user_id', user.id)
+      }
+      // Optional audit: credit_purchases
+      const adaAmount = Number((credits / 100).toFixed(2))
+      const unitPrice = Number((adaAmount / credits).toFixed(6))
+      await supabase.from('credit_purchases').insert({
+        user_id: user.id,
+        credits,
+        ada_amount: adaAmount,
+        unit_price: unitPrice
+      })
+    } catch (e) {
+      console.warn('⚠️ Skipped user_balances/credit_purchases update:', e)
+    }
+
     return NextResponse.json({
       success: true,
       newBalance: amountToJSON(newBalance),

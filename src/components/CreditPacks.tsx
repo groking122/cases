@@ -7,16 +7,14 @@ import { useWallet } from '@meshsdk/react'
 import { Transaction } from '@meshsdk/core'
 import WalletSelector from './WalletSelector'
 
-interface CreditPack {
-  id: number
-  credits: number
-  price: number // Price in ADA
-}
+interface CreditPack { id: string; credits: number; ada: number }
 
+// Flat unit price (ADA per credit)
+const UNIT_ADA_PER_CREDIT = 0.01
 const CREDIT_PACKS: CreditPack[] = [
-  { id: 1, credits: 1000, price: 9.99 }, // 1 ADA/case (10 cases)
-  { id: 2, credits: 2500, price: 19.99 }, // 0.80 ADA/case (25 cases, 20% discount)
-  { id: 3, credits: 6000, price: 39.99 } // 0.67 ADA/case (60 cases, 33% discount)
+  { id: 'p1000', credits: 1000, ada: +(1000 * UNIT_ADA_PER_CREDIT).toFixed(2) },
+  { id: 'p2500', credits: 2500, ada: +(2500 * UNIT_ADA_PER_CREDIT).toFixed(2) },
+  { id: 'p6000', credits: 6000, ada: +(6000 * UNIT_ADA_PER_CREDIT).toFixed(2) }
 ]
 
 interface CreditPacksProps {
@@ -72,14 +70,8 @@ export default function CreditPacks({
     }
   }
 
-  const calculateDiscount = (pack: CreditPack) => {
-    const casesInPack = pack.credits / 100 // Each case costs 100 credits
-    const baselinePricePerCase = 0.999 // ~1 ADA per case (baseline from first pack: 9.99/10)
-    const regularPrice = casesInPack * baselinePricePerCase
-    const savings = regularPrice - pack.price
-    const discountPercent = Math.round((savings / regularPrice) * 100)
-    return discountPercent > 0 ? discountPercent : 0
-  }
+  // No discounts in flat pricing model
+  const calculateDiscount = (_pack: CreditPack) => 0
 
   const handlePurchase = async (pack: CreditPack) => {
     console.log('🛒 Starting instant credit purchase for pack:', pack)
@@ -123,7 +115,7 @@ export default function CreditPacks({
 
       console.log('💰 Building transaction:', {
         pack: pack.credits + ' credits',
-        price: pack.price + ' ADA',
+        price: pack.ada + ' ADA',
         address: paymentAddress.substring(0, 20) + '...'
       })
 
@@ -140,10 +132,10 @@ export default function CreditPacks({
           }
         }
         
-        console.log('💰 ADA Balance:', adaBalance, 'Required:', pack.price)
+        console.log('💰 ADA Balance:', adaBalance, 'Required:', pack.ada)
         
-        if (adaBalance < pack.price) {
-          throw new Error(`Insufficient ADA balance. You have ${adaBalance.toFixed(2)} ADA but need ${pack.price} ADA`)
+        if (adaBalance < pack.ada) {
+          throw new Error(`Insufficient ADA balance. You have ${adaBalance.toFixed(2)} ADA but need ${pack.ada} ADA`)
         }
       } catch (balanceError: unknown) {
         console.warn('⚠️ Could not check balance:', balanceError)
@@ -151,9 +143,9 @@ export default function CreditPacks({
       }
 
       // Build transaction with proper error handling
-      const priceInLovelace = Math.floor(pack.price * 1000000).toString()
+      const priceInLovelace = Math.floor(pack.ada * 1000000).toString()
       console.log('🔨 Transaction details:', {
-        priceInADA: pack.price,
+        priceInADA: pack.ada,
         priceInLovelace: priceInLovelace,
         paymentAddress: paymentAddress
       })
