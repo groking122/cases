@@ -54,6 +54,18 @@ export default function WalletBalance({
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasFetchedInitial = useRef<boolean>(false)
 
+  // Hydrate from cached last known credits to avoid flashing 0 after sleep/tab-idle
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const cached = window.localStorage.getItem('lastKnownCredits')
+      const cachedNum = cached != null ? Number(cached) : NaN
+      if (!Number.isNaN(cachedNum) && cachedNum > 0) {
+        previousCredits.current = cachedNum
+        setBalance(prev => ({ ...prev, credits: cachedNum }))
+      }
+    }
+  }, [])
+
   // Smooth credit animation when credits change
   const animateCreditsChange = (newCredits: number, oldCredits: number) => {
     const change = newCredits - oldCredits
@@ -64,10 +76,49 @@ export default function WalletBalance({
   }
 
   // Enhanced credit fetching with instant updates
+  // Silent reverify to recover from expired/missing token
+  const silentReverify = useCallback(async (): Promise<boolean> => {
+    try {
+      let wa = externalWalletAddress
+      if (!wa && wallet) {
+        const walletAddresses = await wallet.getUsedAddresses()
+        wa = Array.isArray(walletAddresses) ? walletAddresses[0] : walletAddresses
+      }
+      if (!wa) return false
+      const nres = await fetch('/api/auth/wallet/nonce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: wa })
+      })
+      const ndata = await nres.json().catch(() => null)
+      if (!nres.ok || !ndata?.nonce) return false
+      const vres = await fetch('/api/auth/wallet/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress: wa, signature: ndata.nonce })
+      })
+      const vdata = await vres.json().catch(() => null)
+      if (!vres.ok || !vdata?.token) return false
+      try {
+        localStorage.setItem('userToken', vdata.token)
+        window.dispatchEvent(new Event('user-token-set'))
+      } catch {}
+      return true
+    } catch {
+      return false
+    }
+  }, [externalWalletAddress, wallet])
+
   const fetchCredits = useCallback(async (showAnimation = false) => {
     if (!connected) return 0
 
     try {
+      // Ensure JWT exists before calling protected endpoint
+      const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      if (!token) {
+        return previousCredits.current || 0
+      }
+
       let walletAddress = externalWalletAddress
       
       // If no external wallet address provided, get it from the wallet
@@ -81,7 +132,14 @@ export default function WalletBalance({
         return 0
       }
       
-      const response = await authFetch('/api/get-credits', { method: 'POST' })
+      let response = await authFetch('/api/get-credits', { method: 'POST' })
+      if (response.status === 401) {
+        // Attempt silent reverify once, then retry
+        const reauthed = await silentReverify()
+        if (reauthed) {
+          response = await authFetch('/api/get-credits', { method: 'POST' })
+        }
+      }
       
       if (response.ok) {
         const data = await response.json()
@@ -92,6 +150,7 @@ export default function WalletBalance({
         }
         
         previousCredits.current = newCredits
+        try { localStorage.setItem('lastKnownCredits', String(newCredits)) } catch {}
         return newCredits
       }
     } catch (error) {
@@ -99,7 +158,7 @@ export default function WalletBalance({
     }
     // Do not clobber a known balance with 0 on failures
     return previousCredits.current || 0
-  }, [connected, externalWalletAddress]) // Removed wallet dependency to prevent recreation
+  }, [connected, externalWalletAddress, silentReverify]) // Removed wallet dependency to prevent recreation
 
   // Instant credit update (called externally)
   const updateCreditsInstantly = async (expectedCredits: number | undefined = undefined) => {
@@ -114,6 +173,7 @@ export default function WalletBalance({
         credits: expectedCredits,
         lastUpdate: Date.now()
       }))
+      try { localStorage.setItem('lastKnownCredits', String(expectedCredits)) } catch {}
       animateCreditsChange(expectedCredits, oldCredits)
       
       if (onCreditsChange) {
@@ -129,6 +189,7 @@ export default function WalletBalance({
         credits: actualCredits,
         lastUpdate: Date.now()
       }))
+      try { localStorage.setItem('lastKnownCredits', String(actualCredits)) } catch {}
       
       if (onCreditsChange) {
         onCreditsChange(actualCredits)
@@ -195,13 +256,15 @@ export default function WalletBalance({
           return prev // Return the same object to prevent re-render
         }
         
-        return {
+        const nextState = {
           ada: (adaBalance === 0 && prev.ada > 0) ? prev.ada : adaBalance,
           token: 0,
           credits,
           loading: false,
           lastUpdate: Date.now()
         }
+        try { localStorage.setItem('lastKnownCredits', String(credits)) } catch {}
+        return nextState
       })
 
       // Notify parent of credit changes
@@ -329,8 +392,41 @@ export default function WalletBalance({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).updateWalletCredits = updateCreditsInstantly
+      // Listen for token being set to trigger a refresh without animation
+      const onTokenSet = () => {
+        if (connected) {
+          fetchBalance(false)
+        }
+      }
+      try {
+        window.addEventListener('user-token-set', onTokenSet)
+      } catch {}
+      return () => {
+        try { window.removeEventListener('user-token-set', onTokenSet) } catch {}
+      }
     }
   }, [updateCreditsInstantly])
+
+  // Refresh on focus/visibility/online to recover after sleep/tab-idle
+  useEffect(() => {
+    if (!connected) return
+    const onFocusVisible = () => {
+      if (document.visibilityState === 'visible') fetchBalance(false)
+    }
+    const onOnline = () => fetchBalance(false)
+    try {
+      window.addEventListener('focus', onFocusVisible)
+      document.addEventListener('visibilitychange', onFocusVisible)
+      window.addEventListener('online', onOnline)
+    } catch {}
+    return () => {
+      try {
+        window.removeEventListener('focus', onFocusVisible)
+        document.removeEventListener('visibilitychange', onFocusVisible)
+        window.removeEventListener('online', onOnline)
+      } catch {}
+    }
+  }, [connected, fetchBalance])
 
   if (!connected) {
     return (

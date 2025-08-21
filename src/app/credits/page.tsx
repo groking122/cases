@@ -13,7 +13,7 @@ import ThemeToggle from "@/components/ThemeToggle"
 import { authFetch } from '@/lib/authFetch'
 
 interface UserCredits {
-  credits: number
+  credits: number | null
   loading: boolean
 }
 
@@ -22,7 +22,7 @@ interface UserCredits {
 export default function CreditsPage() {
   const { connected, wallet, connect, connecting } = useWallet()
   const router = useRouter()
-  const [userCredits, setUserCredits] = useState<UserCredits>({ credits: 0, loading: false })
+  const [userCredits, setUserCredits] = useState<UserCredits>({ credits: null, loading: false })
   const [adaBalance, setAdaBalance] = useState<number>(0)
   const [walletAddress, setWalletAddress] = useState<string>("")
 
@@ -36,6 +36,18 @@ export default function CreditsPage() {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
       setWalletAddress(walletAddress)
+
+      // Hydrate from per-wallet cache immediately to avoid flashing 0
+      try {
+        const cacheKey = `lastKnownCredits:${walletAddress}`
+        const cached = localStorage.getItem(cacheKey)
+        if (cached != null) {
+          const cachedNum = Number(cached)
+          if (!Number.isNaN(cachedNum)) {
+            setUserCredits(prev => ({ ...prev, credits: cachedNum }))
+          }
+        }
+      } catch {}
       
       // Fetch credits (JWT auth) - uses cookie fallback via server
       // Ensure token exists (perform nonce/verify if needed)
@@ -65,6 +77,7 @@ export default function CreditsPage() {
         const data = await response.json()
         if (typeof data.credits === 'number') {
           setUserCredits({ credits: data.credits, loading: false })
+          try { localStorage.setItem(`lastKnownCredits:${walletAddress}`, String(data.credits)) } catch {}
         } else {
           setUserCredits(prev => ({ ...prev, loading: false }))
         }
@@ -113,6 +126,7 @@ export default function CreditsPage() {
 
   const handleCreditsUpdate = (newCredits: number) => {
     setUserCredits(prev => ({ ...prev, credits: newCredits, loading: false }))
+    try { if (walletAddress) localStorage.setItem(`lastKnownCredits:${walletAddress}`, String(newCredits)) } catch {}
   }
 
 
@@ -172,7 +186,7 @@ export default function CreditsPage() {
               <ThemeToggle />
               <WalletBalance 
                 connected={connected}
-                credits={userCredits.credits}
+                credits={userCredits.credits ?? undefined}
                 cardanoBalance={adaBalance}
                 onCreditsChange={handleCreditsUpdate}
               />
@@ -232,7 +246,7 @@ export default function CreditsPage() {
                   {userCredits.loading ? (
                     <div className="mx-auto w-40 h-6 rounded bg-foreground/10 animate-pulse" aria-hidden="true" />
                   ) : (
-                    `${userCredits.credits.toLocaleString()} Credits`
+                    `${(userCredits.credits ?? 0).toLocaleString()} Credits`
                   )}
                 </div>
                 <p className="text-foreground/60 text-sm">

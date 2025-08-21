@@ -4,16 +4,7 @@ import { userCreationLimiter } from '@/lib/rate-limit.js'
 
 export async function POST(request: NextRequest) {
   try {
-    // Check rate limit for user creation
-    try {
-      await userCreationLimiter.check(request);
-    } catch (rateLimitError: any) {
-      console.warn('⚠️ User creation rate limit exceeded');
-      return NextResponse.json(
-        { error: rateLimitError?.message || 'Rate limit exceeded' },
-        { status: 429 }
-      );
-    }
+    // NOTE: Do not rate-limit lookups. We'll rate-limit only when we actually create a user below.
 
     // Check if Supabase is configured
     if (!supabaseAdmin) {
@@ -31,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Wallet address is required' }, { status: 400 })
     }
 
-    // Check if user exists by wallet address
+    // Check if user exists by wallet address (no rate limit for this read)
     let { data: user, error } = await supabaseAdmin
       .from('users')
       .select('*')
@@ -43,6 +34,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user) {
+      // Rate-limit only the actual creation path
+      try {
+        await userCreationLimiter.check(request);
+      } catch (rateLimitError: any) {
+        console.warn('⚠️ User creation rate limit exceeded');
+        return NextResponse.json(
+          { error: rateLimitError?.message || 'Rate limit exceeded' },
+          { status: 429 }
+        );
+      }
       // Create new user with wallet address
       const newUsername = username || `Gamer_${walletAddress.slice(-6)}`
       
