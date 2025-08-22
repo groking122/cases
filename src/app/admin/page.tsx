@@ -10,6 +10,8 @@ import SymbolLibrary from '@/components/admin/SymbolLibrary'
 import SymbolCreator from '@/components/admin/SymbolCreator'
 import SymbolEditor from '@/components/admin/SymbolEditor'
 import AdminAnalytics from '@/components/admin/AdminAnalytics'
+import dynamic from 'next/dynamic'
+const AdminMetrics = dynamic(() => import('./components/AdminMetrics'), { ssr: false })
 import WithdrawalRequests from '@/components/admin/WithdrawalRequests'
 
 interface AdminDashboardProps {
@@ -18,7 +20,7 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'withdrawals' | 'account'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'metrics' | 'withdrawals' | 'account'>('dashboard')
   const [stats, setStats] = useState<AdminDashboardStats | null>(null)
   const [cases, setCases] = useState<CaseConfig[]>([])
   const [symbols, setSymbols] = useState<Symbol[]>([])
@@ -113,6 +115,7 @@ export default function AdminDashboard() {
     { id: 'symbols', label: 'Symbols', icon: '💎' },
     { id: 'withdrawals', label: 'Withdrawals', icon: '💸' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
+    { id: 'metrics', label: 'Metrics', icon: '🧮' },
     { id: 'account', label: 'Account', icon: '🔐' }
   ] as const
 
@@ -336,6 +339,10 @@ export default function AdminDashboard() {
               }}
               onDateRangeChange={(range) => console.log('Date range changed:', range)}
             />
+          )}
+
+          {activeTab === 'metrics' && (
+            <AdminMetrics />
           )}
 
           {activeTab === 'account' && (
@@ -609,41 +616,26 @@ function CasesList({
 
 // Account security settings
 function AccountSecurity() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [mfa, setMfa] = useState(false)
-
-  const save = async () => {
-    const res = await fetch('/api/admin/account', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
-      body: JSON.stringify({ email: email || undefined, password: password || undefined, mfaEnabled: mfa })
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data.success) {
-      alert(data.error || 'Failed to update account')
-    } else {
-      alert('Account updated')
-      setPassword('')
-    }
-  }
-
   return (
     <div className="max-w-md bg-card border border-border rounded-xl p-6">
-      <h3 className="text-lg font-semibold mb-4">Account Security</h3>
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm mb-1">New Email</label>
-          <input className="w-full bg-background border border-border rounded-lg px-3 py-2" value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@domain.com" />
+      <h3 className="text-lg font-semibold mb-1">Account</h3>
+      <p className="text-sm text-foreground/60 mb-4">Identity is managed outside the admin dashboard.</p>
+      <div className="space-y-3 text-sm">
+        <div className="flex justify-between">
+          <span>Email</span>
+          <span className="font-mono">(hidden)</span>
         </div>
-        <div>
-          <label className="block text-sm mb-1">New Password</label>
-          <input type="password" className="w-full bg-background border border-border rounded-lg px-3 py-2" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" />
+        <div className="flex justify-between">
+          <span>Role</span>
+          <span className="px-2 py-0.5 rounded bg-zinc-800">Admin</span>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={mfa} onChange={e=>setMfa(e.target.checked)} /> Enable MFA (TOTP)
-        </label>
-        <button onClick={save} className="w-full bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white px-4 py-2 rounded-lg">Save</button>
+        <div className="flex justify-between">
+          <span>MFA</span>
+          <span className="text-green-500">Required</span>
+        </div>
+      </div>
+      <div className="text-xs text-foreground/60 mt-4">
+        To change email or password, use the auth provider console or owner CLI. This dashboard does not allow identity changes.
       </div>
     </div>
   )

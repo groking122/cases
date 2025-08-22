@@ -10,6 +10,12 @@ export default function AdminAnalytics({
   onDateRangeChange
 }: AdminAnalyticsProps) {
   const [activeMetric, setActiveMetric] = useState<string>('overview')
+  const [advanced, setAdvanced] = useState<{
+    rtp?: any[]
+    pity?: any[]
+    flow?: any
+    withdrawalsOps?: any
+  }>({})
 
   const formatDate = (date: Date) => {
     return date.toISOString().split('T')[0]
@@ -21,6 +27,29 @@ export default function AdminAnalytics({
       ...dateRange,
       [field]: newDate
     })
+  }
+
+  // Fetch advanced metrics from admin metrics endpoint (hours based on dateRange)
+  const refreshAdvanced = async () => {
+    try {
+      const hours = Math.max(1, Math.round((Date.now() - dateRange.start.getTime()) / (1000 * 60 * 60)))
+      const res = await fetch(`/api/admin/metrics?hours=${hours}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('adminToken') || localStorage.getItem('admin_token') || ''}` },
+        cache: 'no-store'
+      })
+      const json = await res.json().catch(() => null)
+      if (!json) return
+      if (json.window && json.generatedAt) {
+        setAdvanced({
+          rtp: json.rtp || [],
+          pity: json.pity || [],
+          flow: json.flow || {},
+          withdrawalsOps: json.withdrawals || {},
+        })
+      } else if (json.success) {
+        setAdvanced({ rtp: json.data?.rtp || [], pity: json.data?.pity || [], flow: json.data?.flow || {}, withdrawalsOps: json.data?.withdrawalsOps || {} })
+      }
+    } catch {}
   }
 
   const metricCards = [
@@ -92,6 +121,7 @@ export default function AdminAnalytics({
               className="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm"
             />
           </div>
+          <button onClick={refreshAdvanced} className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 rounded">Load KPIs</button>
         </div>
       </div>
 
@@ -207,6 +237,90 @@ export default function AdminAnalytics({
             <div className="text-green-300 text-sm">
               Admin dashboard is running smoothly with all features enabled
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced KPIs */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-gray-800 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4">🎯 RTP by Case (range)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-gray-400">
+                <tr>
+                  <th className="text-left py-2">Case</th>
+                  <th className="text-right py-2">Spins</th>
+                  <th className="text-right py-2">RTP</th>
+                  <th className="text-right py-2">Edge</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {(advanced.rtp || []).map((r: any) => (
+                  <tr key={r.case_id}>
+                    <td className="py-2">{r.case_name || r.case_id}</td>
+                    <td className="py-2 text-right">{r.spins}</td>
+                    <td className={`py-2 text-right ${Number(r.rtp) > 0.95 ? 'text-red-400' : 'text-green-400'}`}>{Number(r.rtp).toFixed(3)}</td>
+                    <td className="py-2 text-right">{Number(r.house_edge).toFixed(3)}</td>
+                  </tr>
+                ))}
+                {(!advanced.rtp || advanced.rtp.length === 0) && (
+                  <tr><td colSpan={4} className="py-4 text-center text-gray-500">No data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-4">🧯 Pity Monitor (range)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-gray-400">
+                <tr>
+                  <th className="text-left py-2">Case</th>
+                  <th className="text-right py-2">Spins</th>
+                  <th className="text-right py-2">Pity %</th>
+                  <th className="text-right py-2">RTP</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {(advanced.pity || []).map((p: any) => (
+                  <tr key={p.case_id}>
+                    <td className="py-2">{p.case_id}</td>
+                    <td className="py-2 text-right">{p.spins}</td>
+                    <td className={`py-2 text-right ${Number(p.pity_rate) > 0.022 ? 'text-yellow-400' : 'text-gray-300'}`}>{(Number(p.pity_rate) * 100).toFixed(2)}%</td>
+                    <td className={`py-2 text-right ${Number(p.rtp) > 0.935 ? 'text-red-400' : 'text-green-400'}`}>{Number(p.rtp).toFixed(3)}</td>
+                  </tr>
+                ))}
+                {(!advanced.pity || advanced.pity.length === 0) && (
+                  <tr><td colSpan={4} className="py-4 text-center text-gray-500">No data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-2">💳 Credit Flow (range)</h3>
+          <div className="text-sm text-gray-300 space-y-1">
+            <div className="flex justify-between"><span>Purchases (ADA)</span><b>{Number(advanced.flow?.purchases || 0).toFixed(2)}</b></div>
+            <div className="flex justify-between"><span>Winnings credited (credits)</span><b>{Number(advanced.flow?.winnings_credited || 0).toFixed(0)}</b></div>
+            <div className="flex justify-between"><span>Withdrawals Gross (ADA)</span><b>{Number(advanced.flow?.withdrawals_gross || 0).toFixed(2)}</b></div>
+            <div className="flex justify-between"><span>Withdrawals Net (ADA)</span><b>{Number(advanced.flow?.withdrawals_net || 0).toFixed(2)}</b></div>
+            <div className="flex justify-between"><span>Platform Fees (ADA)</span><b>{Number(advanced.flow?.platform_fees || 0).toFixed(2)}</b></div>
+            <div className="flex justify-between"><span>Network Fees (ADA)</span><b>{Number(advanced.flow?.network_fees || 0).toFixed(2)}</b></div>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-xl p-6">
+          <h3 className="text-lg font-semibold mb-2">💸 Withdrawals Ops (range)</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm text-gray-300">
+            <div className="bg-gray-700/50 p-3 rounded"><div className="text-xs">Pending</div><div className="text-lg font-bold">{advanced.withdrawalsOps?.pending || 0}</div></div>
+            <div className="bg-gray-700/50 p-3 rounded"><div className="text-xs">Processing</div><div className="text-lg font-bold">{advanced.withdrawalsOps?.processing || 0}</div></div>
+            <div className="bg-gray-700/50 p-3 rounded"><div className="text-xs">Sent</div><div className="text-lg font-bold">{advanced.withdrawalsOps?.sent || 0}</div></div>
+            <div className="bg-gray-700/50 p-3 rounded"><div className="text-xs">Failed</div><div className="text-lg font-bold">{advanced.withdrawalsOps?.failed || 0}</div></div>
+            <div className="bg-gray-700/50 p-3 rounded col-span-2"><div className="text-xs">Median payout (min)</div><div className="text-lg font-bold">{Number(advanced.withdrawalsOps?.median_payout_minutes || 0).toFixed(1)}</div></div>
           </div>
         </div>
       </div>

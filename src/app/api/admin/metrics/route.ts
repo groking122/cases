@@ -2,129 +2,124 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { verifyAdminToken } from '@/lib/adminAuth'
 
-type MetricsResponse = {
-  success: true
-  data: {
-    credits24h: {
-      net: string
-      inflow: string
-      outflow: string
-      breakdown: { bets: string; wins: string; deposits: string; withdrawals: string }
-      topWinners: { user_id: string; net: string }[]
-      topLosers: { user_id: string; net: string }[]
-    }
-    withdrawals: {
-      pendingCount: number
-      pendingSum: number
-      oldest?: { id: string; user_id: string; credits_requested: number; created_at: string }
-    }
-    integrity: {
-      expiredNonces: number
-    }
-  }
-  timestamp: string
-} | { success: false; error: string; timestamp: string }
+type MetricsPayload = {
+  window: string
+  rtp: Array<{ caseId: string; caseName?: string; spins: number; totalCost: number; totalReward: number; rtp: number; houseEdge: number }>
+  pity: Array<{ caseId: string; spins: number; pityRate: number; rtp: number }>
+  flow: { purchases: number; winnings_credited: number; withdrawals_gross: number; withdrawals_net: number; platform_fees: number; network_fees: number }
+  withdrawals: { pending: number; processing: number; sent: number; failed: number; median_payout_minutes: number; avg_payout_minutes: number }
+  generatedAt: string
+}
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifyAdminToken(request, ['view_analytics'])
     if (!auth.success) {
-      return NextResponse.json({ success: false, error: auth.error || 'Unauthorized', timestamp: new Date().toISOString() }, { status: 401 })
+      return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 })
     }
     if (!supabase) {
-      return NextResponse.json({ success: false, error: 'Database configuration error', timestamp: new Date().toISOString() }, { status: 500 })
+      return NextResponse.json({ error: 'Database configuration error' }, { status: 500 })
     }
 
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const { searchParams } = new URL(request.url)
+    const hours = Math.max(1, Math.min(24 * 30, Number(searchParams.get('hours') || 24)))
+    const startIso = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
+    const endIso = new Date().toISOString()
 
-    // Fetch last 24h credit_events (bounded volume)
-    const { data: ce, error: ceErr } = await supabase
-      .from('credit_events')
-      .select('user_id, delta, reason, created_at')
-      .gte('created_at', since)
-    if (ceErr) throw ceErr
-
-    let bets = 0n,
-      wins = 0n,
-      deposits = 0n,
-      withdrawals = 0n,
-      inflow = 0n,
-      outflow = 0n
-    const byUser = new Map<string, bigint>()
-
-    for (const row of ce || []) {
-      const delta = BigInt(String((row as any).delta ?? 0))
-      const reason = String((row as any).reason ?? '')
-      if (reason.startsWith('bet:')) bets += delta
-      else if (reason.startsWith('win:')) wins += delta
-      else if (reason.startsWith('purchase:') || reason.startsWith('recover:') || reason.startsWith('sell:')) deposits += delta
-      else if (reason.startsWith('withdraw:')) withdrawals += delta
-
-      if (delta >= 0n) inflow += delta
-      else outflow += delta
-
-      const uid = String((row as any).user_id)
-      byUser.set(uid, (byUser.get(uid) || 0n) + delta)
+    let rtp: MetricsPayload['rtp'] = []
+    let pity: MetricsPayload['pity'] = []
+    let flow: MetricsPayload['flow'] = {
+      purchases: 0,
+      winnings_credited: 0,
+      withdrawals_gross: 0,
+      withdrawals_net: 0,
+      platform_fees: 0,
+      network_fees: 0,
+    }
+    let withdrawals: MetricsPayload['withdrawals'] = {
+      pending: 0,
+      processing: 0,
+      sent: 0,
+      failed: 0,
+      median_payout_minutes: 0,
+      avg_payout_minutes: 0,
     }
 
-    const movers = Array.from(byUser.entries()).map(([user_id, net]) => ({ user_id, net }))
-    const topWinners = movers.sort((a, b) => (b.net > a.net ? 1 : -1)).slice(0, 10).map(m => ({ user_id: m.user_id, net: m.net.toString() }))
-    const topLosers = movers.sort((a, b) => (a.net > b.net ? 1 : -1)).slice(0, 10).map(m => ({ user_id: m.user_id, net: m.net.toString() }))
-
-    // Withdrawals (pending)
-    const { data: pendingRows } = await supabase
-      .from('withdrawal_requests')
-      .select('id, user_id, credits_requested, status, created_at')
-      .eq('status', 'pending')
-
-    const pendingCount = pendingRows?.length || 0
-    const pendingSum = (pendingRows || []).reduce((a, r: any) => a + (r.credits_requested || 0), 0)
-    let oldest: any = undefined
-    if (pendingRows && pendingRows.length > 0) {
-      pendingRows.sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      const r = pendingRows[0]
-      oldest = { id: r.id, user_id: r.user_id, credits_requested: r.credits_requested, created_at: r.created_at }
+    try {
+      const res = await supabase.rpc('kpi_rtp', { start_ts: startIso, end_ts: endIso })
+      const rows = Array.isArray(res.data) ? res.data : []
+      rtp = rows.map((r: any) => ({
+        caseId: String(r.case_id ?? r.caseId ?? ''),
+        caseName: r.case_name ?? r.caseName ?? undefined,
+        spins: Number(r.spins ?? 0),
+        totalCost: Number(r.total_cost ?? r.totalCost ?? 0),
+        totalReward: Number(r.total_reward ?? r.totalReward ?? 0),
+        rtp: Number(r.rtp ?? 0),
+        houseEdge: Number(r.house_edge ?? r.houseEdge ?? 0),
+      }))
+    } catch (e) {
+      console.error('kpi_rtp error:', e)
     }
 
-    // Integrity: expired nonces (cleanup signal)
-    const { data: nonceRows } = await supabase
-      .from('wallet_nonces')
-      .select('expires_at')
-      .lt('expires_at', new Date().toISOString())
-    const expiredNonces = nonceRows?.length || 0
-
-    const body: MetricsResponse = {
-      success: true,
-      data: {
-        credits24h: {
-          net: (inflow + outflow).toString(),
-          inflow: inflow.toString(),
-          outflow: outflow.toString(),
-          breakdown: {
-            bets: bets.toString(),
-            wins: wins.toString(),
-            deposits: deposits.toString(),
-            withdrawals: withdrawals.toString(),
-          },
-          topWinners,
-          topLosers,
-        },
-        withdrawals: {
-          pendingCount,
-          pendingSum,
-          oldest,
-        },
-        integrity: {
-          expiredNonces,
-        },
-      },
-      timestamp: new Date().toISOString(),
+    try {
+      const res = await supabase.rpc('kpi_pity', { start_ts: startIso, end_ts: endIso })
+      const rows = Array.isArray(res.data) ? res.data : []
+      pity = rows.map((p: any) => ({
+        caseId: String(p.case_id ?? p.caseId ?? ''),
+        spins: Number(p.spins ?? 0),
+        pityRate: Number(p.pity_rate ?? p.pityRate ?? 0),
+        rtp: Number(p.rtp ?? 0),
+      }))
+    } catch (e) {
+      console.error('kpi_pity error:', e)
     }
 
-    return NextResponse.json(body)
+    try {
+      const res = await supabase.rpc('kpi_credit_flow', { start_ts: startIso, end_ts: endIso })
+      const obj = res.data && Array.isArray(res.data) ? res.data[0] : res.data
+      if (obj) {
+        flow = {
+          purchases: Number(obj.purchases ?? 0),
+          winnings_credited: Number(obj.winnings_credited ?? 0),
+          withdrawals_gross: Number(obj.withdrawals_gross ?? 0),
+          withdrawals_net: Number(obj.withdrawals_net ?? 0),
+          platform_fees: Number(obj.platform_fees ?? 0),
+          network_fees: Number(obj.network_fees ?? 0),
+        }
+      }
+    } catch (e) {
+      console.error('kpi_credit_flow error:', e)
+    }
+
+    try {
+      const res = await supabase.rpc('kpi_withdrawals', { start_ts: startIso, end_ts: endIso })
+      const obj = res.data && Array.isArray(res.data) ? res.data[0] : res.data
+      if (obj) {
+        withdrawals = {
+          pending: Number(obj.pending ?? 0),
+          processing: Number(obj.processing ?? 0),
+          sent: Number(obj.sent ?? 0),
+          failed: Number(obj.failed ?? 0),
+          median_payout_minutes: Number(obj.median_payout_minutes ?? 0),
+          avg_payout_minutes: Number(obj.avg_payout_minutes ?? 0),
+        }
+      }
+    } catch (e) {
+      console.error('kpi_withdrawals error:', e)
+    }
+
+    const payload: MetricsPayload = {
+      window: `last_${hours}h`,
+      rtp,
+      pity,
+      flow,
+      withdrawals,
+      generatedAt: new Date().toISOString(),
+    }
+
+    return NextResponse.json(payload)
   } catch (e: any) {
-    return NextResponse.json({ success: false, error: e?.message || 'Internal error', timestamp: new Date().toISOString() }, { status: 500 })
+    return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 })
   }
 }
-
 

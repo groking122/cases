@@ -9,7 +9,8 @@
     "lint": "next lint",
     "sim": "ts-node scripts/simulate-pity.ts",
     "sim:ci": "ts-node scripts/simulate-pity.ts --spins=100000",
-    "peek": "ts-node scripts/peek-metrics.ts"
+    "peek": "ts-node scripts/peek-metrics.ts",
+    "peek:metrics": "ts-node scripts/check-admin-metrics.ts"
   },
   "dependencies": {
     "@emurgo/cardano-serialization-lib-nodejs": "^15.0.0",
