@@ -11,7 +11,7 @@ import CreditPacks from "@/components/CreditPacks"
 import WalletSelector from "@/components/WalletSelector"
 import ThemeToggle from "@/components/ThemeToggle"
 import { authFetch } from '@/lib/authFetch'
-import { WithdrawDialog } from '@/components/WithdrawDialog'
+ 
 
 interface UserCredits {
   credits: number | null
@@ -26,8 +26,7 @@ export default function CreditsPage() {
   const [userCredits, setUserCredits] = useState<UserCredits>({ credits: null, loading: false })
   const [adaBalance, setAdaBalance] = useState<number>(0)
   const [walletAddress, setWalletAddress] = useState<string>("")
-  const [userId, setUserId] = useState<string>("")
-  const [showWithdraw, setShowWithdraw] = useState(false)
+  
 
   // Fetch user credits and ADA balance
   const fetchUserCredits = async () => {
@@ -39,18 +38,7 @@ export default function CreditsPage() {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
       setWalletAddress(walletAddress)
-      // Resolve userId
-      try {
-        const userResponse = await fetch('/api/user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ walletAddress, walletType: 'mesh_connected' })
-        })
-        if (userResponse.ok) {
-          const userData = await userResponse.json()
-          setUserId(userData.user.id)
-        }
-      } catch {}
+      
 
       // Hydrate from per-wallet cache immediately to avoid flashing 0
       try {
@@ -269,15 +257,7 @@ export default function CreditsPage() {
                   Each case opening costs 88-100 credits
                 </p>
               </div>
-              <div className="mt-4 flex justify-center">
-                <Button
-                  onClick={() => setShowWithdraw(true)}
-                  className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white px-4 py-2 rounded-xl font-medium border border-emerald-500/30"
-                  disabled={!userId}
-                >
-                  🏦 Withdraw Credits
-                </Button>
-              </div>
+              
             </motion.div>
 
             {/* Credit Packs - Using CreditPacks Component */}
@@ -355,15 +335,7 @@ export default function CreditsPage() {
 
 
     </div>
-    {showWithdraw && (
-      <WithdrawDialog
-        open={showWithdraw}
-        onClose={() => setShowWithdraw(false)}
-        maxWithdrawable={(userCredits.credits ?? 0)}
-        userId={userId}
-        defaultAddress={walletAddress}
-      />
-    )}
+    
     </>
   )
 }

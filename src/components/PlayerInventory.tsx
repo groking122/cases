@@ -291,6 +291,9 @@ export default function PlayerInventory({ isOpen, onClose, onCreditsUpdated }: P
             <div>
               <h2 className="text-xl font-bold text-foreground mb-1">💎 Stash</h2>
               <div className="text-sm text-foreground/70 mb-3">Balance: <span className="font-semibold text-orange-400">{userCredits.toLocaleString()} credits</span> • ≈ {(userCredits * 0.01).toFixed(2)} ADA</div>
+              <div className="text-xs text-foreground/60 mb-3">
+                Cash-out uses a market spread and includes a 1% service fee. Network fees apply.
+              </div>
               <Button onClick={() => setShowWithdrawalForm(true)} disabled={userCredits < 1000} className="bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white text-sm px-4 py-2" size="sm">
                 {userCredits < 1000 ? '🔒 Need 1,000+' : '🏦 Withdraw'}
               </Button>
