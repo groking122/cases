@@ -33,7 +33,7 @@ export default function CreditPacks({
   onError 
 }: CreditPacksProps) {
   const { connected, wallet, connect, connecting } = useWallet()
-  const [purchasing, setPurchasing] = useState<number | null>(null)
+  const [purchasing, setPurchasing] = useState<string | null>(null)
   const [inlineError, setInlineError] = useState<string | null>(null)
   const [canHover, setCanHover] = useState<boolean>(true)
 
@@ -89,7 +89,7 @@ export default function CreditPacks({
     }
 
     // Confirm purchase with user before proceeding
-    const confirmed = window.confirm(`Purchase ${pack.credits} credits for ${pack.price} ADA?`)
+    const confirmed = window.confirm(`Purchase ${pack.credits} credits for ${pack.ada} ADA?`)
     if (!confirmed) {
       return
     }
@@ -435,10 +435,10 @@ export default function CreditPacks({
 
                 <div className="space-y-2">
                   <div className="text-3xl font-bold text-orange-400">
-                    {pack.price} ADA
+                    {pack.ada} ADA
                   </div>
                   <div className="text-xs text-gray-500">
-                    {(pack.price / (pack.credits / 100)).toFixed(2)} ADA per case
+                    {(pack.ada / (pack.credits / 100)).toFixed(2)} ADA per case
                   </div>
                 </div>
               </div>
@@ -458,7 +458,7 @@ export default function CreditPacks({
                     <span>Processing Payment...</span>
                   </div>
                 ) : (
-                  `Buy ${pack.credits} Credits - ${pack.price} ADA`
+                  `Buy ${pack.credits} Credits - ${pack.ada} ADA`
                 )}
               </Button>
 
