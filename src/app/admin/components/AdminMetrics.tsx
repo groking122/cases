@@ -19,6 +19,10 @@ function fmtPct(x: number) {
   return `${(x * 100).toFixed(2)}%`
 }
 
+function fmtMin(n: number | string | null | undefined) {
+  return Number(n ?? 0).toFixed(1)
+}
+
 export default function AdminMetrics() {
   const [hours, setHours] = useState<number>(24)
   const [data, setData] = useState<MetricsPayload | null>(null)
@@ -223,8 +227,8 @@ export default function AdminMetrics() {
           <div className="bg-muted/30 border border-border rounded p-3"><div className="text-xs">Failed</div><div className="text-lg font-bold">{data?.withdrawals.failed ?? 0}</div></div>
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm mt-3">
-          <div className="bg-muted/30 border border-border rounded p-3"><div className="text-xs">Median payout (min)</div><div className="text-lg font-bold">{(data?.withdrawals.median_payout_minutes ?? 0).toFixed ? (data?.withdrawals.median_payout_minutes as any).toFixed(1) : Number(data?.withdrawals.median_payout_minutes || 0).toFixed(1)}</div></div>
-          <div className="bg-muted/30 border border-border rounded p-3"><div className="text-xs">Average payout (min)</div><div className="text-lg font-bold">{(data?.withdrawals.avg_payout_minutes ?? 0).toFixed ? (data?.withdrawals.avg_payout_minutes as any).toFixed(1) : Number(data?.withdrawals.avg_payout_minutes || 0).toFixed(1)}</div></div>
+          <div className="bg-muted/30 border border-border rounded p-3"><div className="text-xs">Median payout (min)</div><div className="text-lg font-bold">{fmtMin(data?.withdrawals.median_payout_minutes)}</div></div>
+          <div className="bg-muted/30 border border-border rounded p-3"><div className="text-xs">Average payout (min)</div><div className="text-lg font-bold">{fmtMin(data?.withdrawals.avg_payout_minutes)}</div></div>
         </div>
       </div>
     </div>
