@@ -4,7 +4,6 @@ import { withRateLimit, caseOpeningLimiter } from '@/lib/rate-limit.js';
 import { getSecureRandomForCaseOpening, generateServerSeed } from '@/lib/entropy.js';
 import { getBearerToken, verifyUserToken } from '@/lib/userAuth'
 import { withUserAuth } from '@/lib/mw/withUserAuth'
-import { getPityConfigForCase } from '@/config/pity';
 import { applyCredit } from '@/lib/credits/applyCredit'
 import { amountToJSON } from '@/lib/credits/format'
 // Removed hardcoded symbols - using database case_symbols instead
@@ -139,7 +138,7 @@ async function caseOpeningHandler(request: NextRequest) {
     );
     const randomValue = typeof entropyResult === 'object' ? entropyResult.randomValue : entropyResult;
 
-    // Implement pity timer (force rare item after consecutive losses)
+    // Pity disabled: select symbol purely by weight
     let selectedSymbol;
     let isPityActivated = false;
 
@@ -179,39 +178,10 @@ async function caseOpeningHandler(request: NextRequest) {
     const getRelSymbol = (cs: any) => Array.isArray(cs.symbols) ? cs.symbols[0] : cs.symbols
     console.log('🎰 Available symbols:', caseSymbols.map(cs => { const sym = getRelSymbol(cs); return ({ name: sym.name, weight: cs.weight }) }))
 
-    // Check recent openings for pity timer and cooldown
-    const { data: recentOpenings, error: openingsError } = await supabaseAdmin
-      .from('case_openings')
-      .select('symbol_key, reward_value, case_cost, created_at, is_pity_activated')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    let lossStreak = 0;
-    let pityOnCooldown = false;
-    let spinsSinceLastPity = Number.POSITIVE_INFINITY;
-    if (!openingsError && recentOpenings && Array.isArray(recentOpenings)) {
-      // Calculate loss streak using strict loss: reward_value < case_cost
-      const recentForStreak = recentOpenings.slice(0, 20);
-      lossStreak = calculateLossStreak(recentForStreak);
-
-      // Cooldown: max 1 pity per 50 spins
-      pityOnCooldown = recentOpenings.some((o: any) => o.is_pity_activated === true);
-      const idx = recentOpenings.findIndex((o: any) => o.is_pity_activated === true);
-      if (idx >= 0) {
-        spinsSinceLastPity = idx; // because list is ordered desc, idx counts spins since last pity
-      }
-
-      console.log('🎯 Loss streak analysis:', {
-        recentOpenings: recentOpenings.length,
-        lossStreak,
-        pityOnCooldown,
-        spinsSinceLastPity
-      })
-    }
+    // Pity logic disabled: no streak checks
 
     // Always perform normal weighted selection first (using database symbols)
-    // We'll potentially override with pity afterwards, only if the normal roll would be a loss
+    // Pure weighted selection only
     {
       let cumulative = 0;
       const randomChoice = randomValue * 100; // Convert to percentage [0,100)
@@ -238,33 +208,7 @@ async function caseOpeningHandler(request: NextRequest) {
       }
     }
 
-    // Pity eligibility: strict loss streak (>= threshold) AND not in cooldown AND current roll would be a loss
-    const pityConfig = getPityConfigForCase(caseId);
-    const PITY_THRESHOLD = pityConfig.threshold; // threshold per UX/economy spec
-    const PITY_SPIN_COOLDOWN = pityConfig.cooldownSpins; // informational; enforced by checking last N spins above
-    const PITY_MIN_SINCE_LAST = pityConfig.minSinceLast; // require at least X spins since last pity
-    const wouldLose = (selectedSymbol.value || 0) < caseData.price;
-    const pityEligible = lossStreak >= PITY_THRESHOLD && !pityOnCooldown && (spinsSinceLastPity >= PITY_MIN_SINCE_LAST) && wouldLose;
-
-    if (pityEligible) {
-      const { table: pityTable, ev: evPity } = getPityTableAndEv(pityConfig);
-      const pityPayout = sampleFromProbabilityTable(pityTable, randomValue);
-      const pitySymbol = findClosestSymbolForPayout(caseSymbols, pityPayout);
-      if (pitySymbol) {
-        selectedSymbol = {
-          ...pitySymbol,
-          key: pitySymbol.metadata?.key || pitySymbol.name.toLowerCase().replace(/\s+/g, '_'),
-          multiplier: pitySymbol.value / caseData.price
-        };
-        isPityActivated = true;
-        console.log('🎰 Pity activated (EV-bounded)', {
-          lossStreak,
-          pityPayout,
-          evPity,
-          symbol: selectedSymbol.name
-        })
-      }
-    }
+    // Pity logic disabled: no override
 
     console.log('🎲 Selected symbol:', {
       key: selectedSymbol.key,
@@ -338,7 +282,7 @@ async function caseOpeningHandler(request: NextRequest) {
         client_seed: clientSeed || null,
         nonce: nonce,
         random_value: randomValue,
-        is_pity_activated: isPityActivated,
+        is_pity_activated: false,
         user_balance_before: Number(balanceRow?.amount ?? 0),
         user_balance_after: Number(currentBalance),
         is_withdrawn: credited ? true : false, // only mark withdrawn for credited path
@@ -378,8 +322,8 @@ async function caseOpeningHandler(request: NextRequest) {
     // Check for achievements/milestones
     const achievements = checkAchievements(user, selectedSymbol, newCasesOpened);
 
-    // Calculate streak bonus
-    const streakInfo = calculateStreakBonus(recentOpenings || [], isProfit);
+    // Calculate streak bonus (pity disabled, pass empty recent openings)
+    const streakInfo = calculateStreakBonus([], isProfit);
 
     console.log('🎉 Case opening completed successfully!', {
       caseOpeningId: caseOpening.id,
@@ -440,78 +384,7 @@ async function caseOpeningHandler(request: NextRequest) {
   }
 }
 
-// Helper function to calculate loss streak for pity timer
-function calculateLossStreak(recentOpenings: any[]): number {
-  let streak = 0;
-  
-  for (const opening of recentOpenings) {
-    // Strict loss: reward_value < case_cost
-    if ((opening?.reward_value ?? 0) < (opening?.case_cost ?? 0)) {
-      streak++;
-    } else {
-      break; // Streak broken by a win
-    }
-  }
-  
-  return streak;
-}
-
-// Get pity table and compute EV with validations
-function getPityTableAndEv(cfg?: { table: { payout: number; p: number }[]; evCap?: number }): { table: { payout: number; p: number }[]; ev: number } {
-  // Default lower-EV pity table (EV ≈ 116.9 for 100-cost case)
-  const table = (cfg?.table && cfg.table.length)
-    ? cfg.table
-    : [
-        { payout: 60,   p: 0.35 },
-        { payout: 100,  p: 0.47 },
-        { payout: 150,  p: 0.16 },
-        { payout: 800,  p: 0.019 },
-        { payout: 6000, p: 0.001 }
-      ];
-  const sumP = table.reduce((a, s) => a + s.p, 0);
-  if (Math.abs(sumP - 1) > 1e-6) {
-    throw new Error('Pity table probabilities must sum to 1');
-  }
-  const ev = table.reduce((a, s) => a + s.p * s.payout, 0);
-  const cap = cfg?.evCap ?? 126;
-  if (ev > cap) {
-    throw new Error('Pity EV exceeds safety cap');
-  }
-  return { table, ev };
-}
-
-function sampleFromProbabilityTable(table: { payout: number; p: number }[], r: number): number {
-  let t = 0;
-  for (const row of table) {
-    t += row.p;
-    if (r <= t) return row.payout;
-  }
-  return table[table.length - 1].payout;
-}
-
-// Map the target payout to the closest available symbol in this case
-function findClosestSymbolForPayout(caseSymbols: any[], target: number): any | null {
-  if (!caseSymbols || caseSymbols.length === 0) return null;
-  const getRelSymbol = (cs: any) => Array.isArray(cs.symbols) ? cs.symbols[0] : cs.symbols;
-  let best: any = null;
-  let bestDiff = Number.POSITIVE_INFINITY;
-  for (const cs of caseSymbols) {
-    const sym = getRelSymbol(cs);
-    const value = Number(sym?.value ?? 0);
-    const diff = Math.abs(value - target);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      best = sym;
-    } else if (diff === bestDiff && best) {
-      // Tie-breaker: prefer the symbol with value closer but not exceeding target, else higher value
-      const bestVal = Number(best.value ?? 0);
-      if ((value <= target && bestVal > target) || (value > bestVal)) {
-        best = sym;
-      }
-    }
-  }
-  return best;
-}
+// Pity helpers removed (mechanism disabled)
 
 // Helper function to check for achievements
 function checkAchievements(user: any, symbol: any, newCasesOpened: number): string[] {

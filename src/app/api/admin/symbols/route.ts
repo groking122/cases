@@ -155,15 +155,16 @@ export async function POST(request: NextRequest) {
       authUser: authResult.user
     })
 
+    const safeKey = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
     const symbolData: any = {
       name,
-      symbol: name.toLowerCase().replace(/[^a-z0-9]/g, '_'), // Add symbol key based on name
       description: description || '',
       image_url: imageUrl,
       rarity,
       value: parseFloat(value),
       is_active: isActive !== false,
       metadata: {
+        key: safeKey,
         createdVia: 'admin_dashboard',
         createdBy: authResult.user?.email || 'unknown'
       }
@@ -181,7 +182,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) {
-      throw error
+      return NextResponse.json<AdminApiResponse>({
+        success: false,
+        error: `Insert failed: ${error.message}`,
+        timestamp: new Date().toISOString()
+      }, { status: 400 })
     }
 
     // Log admin action
@@ -202,11 +207,11 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, { status: 201 })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Admin symbols POST error:', error)
     return NextResponse.json<AdminApiResponse>({
       success: false,
-      error: 'Failed to create symbol',
+      error: error?.message || 'Failed to create symbol',
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
