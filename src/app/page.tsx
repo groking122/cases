@@ -304,8 +304,11 @@ export default function Home() {
     
     // If we have real API result, use the actual new balance from the API
     if (result.apiResult && result.apiResult.newBalance !== undefined) {
-      console.log('💰 Updating credits from real API result:', result.apiResult.newBalance)
-      updateCreditsInstantly(result.apiResult.newBalance)
+      // newBalance may be bigint-string from server; coerce safely to number
+      const nbRaw = result.apiResult.newBalance
+      const nb = typeof nbRaw === 'number' ? nbRaw : Number(nbRaw)
+      console.log('💰 Updating credits from real API result:', nb)
+      updateCreditsInstantly(Number.isFinite(nb) ? nb : userCredits.credits)
       
       // Update stats with real values from API
       setGameStats(prev => ({
