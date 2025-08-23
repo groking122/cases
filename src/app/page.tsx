@@ -46,12 +46,13 @@ interface UserCredits {
   loading: boolean
 }
 
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "600", "700", "800"],
+  display: 'swap',
+})
+
 export default function Home() {
-  const nunito = Nunito({
-    subsets: ["latin"],
-    weight: ["400", "600", "700", "800"],
-    display: 'swap',
-  })
   const { connected, wallet, connect, connecting } = useWallet()
   const router = useRouter()
   const [isOpening, setIsOpening] = useState(false)
