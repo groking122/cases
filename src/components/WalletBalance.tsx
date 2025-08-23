@@ -291,16 +291,18 @@ export default function WalletBalance({
           loading: false,
           lastUpdate: Date.now()
         }
-        try {
-          let wa = externalWalletAddress
-          if (!wa && wallet) {
-            const addrs = await wallet.getUsedAddresses()
-            wa = Array.isArray(addrs) ? addrs[0] : addrs
-          }
-          if (wa) localStorage.setItem(`lastKnownCredits:${wa}`, String(credits))
-        } catch {}
         return nextState
       })
+
+      // Persist per-wallet cached credits outside of setState callback (no await inside callbacks)
+      try {
+        let wa = externalWalletAddress
+        if (!wa && wallet) {
+          const addrs = await wallet.getUsedAddresses()
+          wa = Array.isArray(addrs) ? addrs[0] : addrs
+        }
+        if (wa) localStorage.setItem(`lastKnownCredits:${wa}`, String(credits))
+      } catch {}
 
       // Notify parent of credit changes
       if (onCreditsChange && showCredits) {
