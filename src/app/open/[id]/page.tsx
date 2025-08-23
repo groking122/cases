@@ -61,28 +61,11 @@ export default function OpenCasePage() {
       try {
         const addresses = await wallet.getUsedAddresses()
         const walletAddress = addresses[0]
-        let token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
-        // Silent reverify if token missing
-        if (!token && walletAddress) {
-          try {
-            const nonceRes = await fetch('/api/auth/wallet/nonce', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ walletAddress }) })
-            const nonceData = await nonceRes.json()
-            if (nonceRes.ok && nonceData?.nonce) {
-              const verifyRes = await fetch('/api/auth/wallet/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ walletAddress, signature: nonceData.nonce }) })
-              const verifyData = await verifyRes.json()
-              if (verifyRes.ok && verifyData?.token) {
-                localStorage.setItem(`userToken:${walletAddress}`, verifyData.token)
-                localStorage.setItem('userToken', verifyData.token)
-                try { window.dispatchEvent(new Event('user-token-set')) } catch {}
-                token = verifyData.token
-              }
-            }
-          } catch {}
-        }
+        const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
         if (!token) return
         const res = await authFetch('/api/get-credits', { method: 'POST' })
         const data = await res.json()
-        if (res.ok) setUserCredits(typeof data.credits === 'number' ? data.credits : Number(data.credits) || 0)
+        if (res.ok) setUserCredits(data.credits || 0)
       } catch {}
     }
     fetchCredits()
@@ -156,15 +139,7 @@ export default function OpenCasePage() {
   }, [connected, wallet, caseData])
 
   const handleComplete = useCallback((result: any) => {
-    // Prefer API-provided balance if available
-    const nbRaw = result?.apiResult?.newBalance
-    if (nbRaw !== undefined) {
-      const nb = typeof nbRaw === 'number' ? nbRaw : Number(nbRaw)
-      if (Number.isFinite(nb)) {
-        setUserCredits(nb)
-      }
-    }
-    // Also trigger a fetch to confirm
+    // Refresh balance after case opening - notification handled by component
     setRefreshTrigger(prev => prev + 1)
   }, [])
 
