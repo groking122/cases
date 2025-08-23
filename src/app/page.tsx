@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { Nunito } from "next/font/google"
 
 import toast from 'react-hot-toast'
 import WalletBalance from "@/components/WalletBalance"
@@ -46,6 +47,11 @@ interface UserCredits {
 }
 
 export default function Home() {
+  const nunito = Nunito({
+    subsets: ["latin"],
+    weight: ["400", "600", "700", "800"],
+    display: 'swap',
+  })
   const { connected, wallet, connect, connecting } = useWallet()
   const router = useRouter()
   const [isOpening, setIsOpening] = useState(false)
@@ -501,7 +507,7 @@ export default function Home() {
       <motion.header 
         initial={{ y: -100 }}
         animate={{ y: 0 }}
-        className="border-b border-border bg-card/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50"
+        className={`${nunito.className} border-b border-border bg-card/70 backdrop-blur-md fixed top-0 left-0 right-0 z-50`}
       >
         <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex items-center justify-between relative">
           {/* Logo */}
@@ -516,24 +522,24 @@ export default function Home() {
                 className="w-full h-full object-cover"
               />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">FudCoin</span>
+            <span className="text-2xl font-extrabold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">FudCoin</span>
           </motion.div>
 
           {/* Navigation Links - Centered (desktop) */}
           <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
             <motion.a 
               href="#cases" 
-              className="text-foreground/70 hover:text-foreground transition-colors"
+              className="text-sm text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Cases
             </motion.a>
-            <Link href="/inventory" className="text-foreground/70 hover:text-foreground transition-colors">
+            <Link href="/inventory" className="text-sm text-foreground/70 hover:text-foreground transition-colors">
               <motion.span whileHover={{ scale: 1.1 }}>Stash</motion.span>
             </Link>
             <motion.button 
               onClick={() => setShowRules(true)} 
-              className="text-foreground/70 hover:text-foreground transition-colors"
+              className="text-sm text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Rules
@@ -541,11 +547,11 @@ export default function Home() {
           </nav>
 
           {/* Right side - Add Credits, Connected Status, Wallet Balance (desktop) */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 text-sm">
             <ThemeToggle />
             <motion.button
               onClick={handleInstantPurchaseOpen}
-              className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 rounded-xl font-medium hover:from-orange-500 hover:to-red-500 transition-all shadow-lg border border-orange-500/30 backdrop-blur-sm"
+              className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-2 rounded-xl font-semibold hover:from-orange-500 hover:to-red-500 transition-all shadow-lg border border-orange-500/30 backdrop-blur-sm"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               initial={{ x: 100 }}
@@ -557,7 +563,7 @@ export default function Home() {
             
             {connected && (
               <motion.div
-                className="bg-gradient-to-r from-gray-900/90 to-black/90 text-green-400 px-3 py-2 rounded-xl text-sm backdrop-blur-sm border border-green-500/30 shadow-lg"
+                className="bg-gradient-to-r from-gray-900/90 to-black/90 text-green-400 px-3 py-2 rounded-xl backdrop-blur-sm border border-green-500/30 shadow-lg"
                 initial={{ x: 100 }}
                 animate={{ x: 0 }}
                 transition={{ delay: 0.06 }}

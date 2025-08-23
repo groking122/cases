@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins, JetBrains_Mono } from "next/font/google";
+import { Poppins, JetBrains_Mono, Nunito } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
 import { MeshWalletProvider } from "@/components/MeshWalletProvider";
@@ -14,6 +14,13 @@ const poppins = Poppins({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
+  display: 'swap',
+});
+
+const nunito = Nunito({
+  subsets: ["latin"],
+  variable: "--font-nunito",
+  weight: ["400", "600", "700", "800"],
   display: 'swap',
 });
 
@@ -35,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${poppins.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+        className={`${poppins.variable} ${jetbrainsMono.variable} ${nunito.variable} font-sans antialiased`}
       >
         {/* Early theme application to avoid flash */}
         <script
