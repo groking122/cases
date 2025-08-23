@@ -114,6 +114,20 @@ export async function POST(request: NextRequest) {
       }, { status: 401 })
     }
 
+    // Allow symbol creation only on localhost unless explicitly enabled via env
+    try {
+      const host = (request as any)?.nextUrl?.hostname || (request.headers.get('host') || '').split(':')[0]
+      const isLocal = host === 'localhost' || host === '127.0.0.1'
+      const allowEnv = process.env.ALLOW_SYMBOL_CREATION === 'true'
+      if (!isLocal && !allowEnv) {
+        return NextResponse.json<AdminApiResponse>({
+          success: false,
+          error: 'Symbol creation disabled outside localhost. Set ALLOW_SYMBOL_CREATION=true to enable.',
+          timestamp: new Date().toISOString()
+        }, { status: 403 })
+      }
+    } catch {}
+
     const body = await request.json()
     const { name, description, imageUrl, rarity, value, isActive } = body
 
@@ -126,9 +140,20 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Validate rarity
-    const validRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
-    if (!validRarities.includes(rarity)) {
+    // Normalize and validate rarity (DB has a check constraint)
+    const validRarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'] as const
+    const rarityAliases: Record<string, typeof validRarities[number]> = {
+      mythical: 'mythic',
+      legend: 'legendary',
+      legendary: 'legendary',
+      common: 'common',
+      uncommon: 'uncommon',
+      rare: 'rare',
+      epic: 'epic',
+      mythic: 'mythic'
+    }
+    const normalizedRarity = rarityAliases[String(rarity || '').toLowerCase().trim()]
+    if (!normalizedRarity) {
       return NextResponse.json<AdminApiResponse>({
         success: false,
         error: `Invalid rarity. Must be one of: ${validRarities.join(', ')}`,
@@ -158,9 +183,10 @@ export async function POST(request: NextRequest) {
     const safeKey = String(name).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
     const symbolData: any = {
       name,
+      symbol: safeKey, // DB requires non-null symbol column
       description: description || '',
       image_url: imageUrl,
-      rarity,
+      rarity: normalizedRarity,
       value: parseFloat(value),
       is_active: isActive !== false,
       metadata: {
@@ -170,10 +196,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Only add created_by if we have a valid user ID (UUID format)
-    if (authResult.user?.userId && authResult.user.userId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
-      symbolData.created_by = authResult.user.userId
-    }
+    // Note: We no longer set created_by because the symbols table doesn't have this column
 
     const { data: newSymbol, error } = await supabase
       .from('symbols')

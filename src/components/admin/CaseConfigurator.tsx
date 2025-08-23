@@ -158,7 +158,13 @@ export default function CaseConfigurator({
     await onSave(formData)
   }
 
-  const isFormValid = validation?.isValid && formData.name && formData.price > 0 && formData.imageUrl
+  const isFormValid = Boolean(
+    validation?.isValid &&
+    formData.name &&
+    formData.description &&
+    formData.price > 0 &&
+    formData.imageUrl
+  )
 
   return (
     <motion.div
