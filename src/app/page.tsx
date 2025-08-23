@@ -126,6 +126,17 @@ export default function Home() {
       // Get wallet address to get/create user
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
+
+      // If wallet account changed, clear stale auth and persist latest address
+      try {
+        const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
+        if (lastWalletAddress && lastWalletAddress !== walletAddress) {
+          localStorage.removeItem('userToken')
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastWalletAddress', walletAddress)
+        }
+      } catch {}
       
       // First get or create user to get userId
       const userResponse = await fetch('/api/user', {
@@ -195,6 +206,17 @@ export default function Home() {
     try {
       const addresses = await wallet.getUsedAddresses()
       const walletAddress = addresses[0]
+
+      // Detect wallet switch and clear stale token before proceeding
+      try {
+        const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
+        if (lastWalletAddress && lastWalletAddress !== walletAddress) {
+          localStorage.removeItem('userToken')
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastWalletAddress', walletAddress)
+        }
+      } catch {}
 
       // Always fetch ADA balance first so it's not blocked by auth
       try {
@@ -395,6 +417,17 @@ export default function Home() {
       if (!connected || !wallet) return;
       const addresses = await wallet.getUsedAddresses();
       const walletAddress = addresses[0];
+
+      // If wallet changed, clear token and remember address
+      try {
+        const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
+        if (lastWalletAddress && lastWalletAddress !== walletAddress) {
+          localStorage.removeItem('userToken')
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastWalletAddress', walletAddress)
+        }
+      } catch {}
       const userResponse = await fetch('/api/user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

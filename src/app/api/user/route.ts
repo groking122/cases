@@ -65,6 +65,18 @@ export async function POST(request: NextRequest) {
       }
 
       user = newUser
+
+      // Proactively ensure balances row exists for the new user (idempotent)
+      try {
+        const { error: balInitErr } = await supabaseAdmin
+          .from('balances')
+          .insert({ user_id: user.id, amount: 0 })
+        if (balInitErr && (balInitErr as any).code !== '23505') {
+          console.warn('⚠️ Failed to initialize balances row (will be created lazily by APIs):', balInitErr)
+        }
+      } catch (e) {
+        console.warn('⚠️ Skipped balances init due to unexpected error:', e)
+      }
     } else {
       // Update existing user's wallet type and last connection
       const { error: updateError } = await supabaseAdmin
