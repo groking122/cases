@@ -102,6 +102,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const runIdRef = useRef(0)
   const timeoutsRef = useRef<number[]>([])
+  const completionHandledRef = useRef<boolean>(false)
 
   const clearPendingTimeouts = () => {
     for (const id of timeoutsRef.current) {
@@ -166,6 +167,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
     clearPendingTimeouts()
     runIdRef.current += 1
     const thisRunId = runIdRef.current
+    completionHandledRef.current = false
     setIsProcessing(true);
     
     try {
@@ -282,6 +284,9 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                   }
                 })}
                 onComplete={() => {
+                  // Ensure onComplete pipeline runs only once per run
+                  if (completionHandledRef.current) return
+                  completionHandledRef.current = true
                   const myRun = runIdRef.current
                   console.log('🎰 Reel animation completed, transitioning to revealing')
                   
@@ -310,6 +315,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
                         // Show success toast with clean styling
                         const rarityConfig = RARITY_CONFIG[currentReward.rarity as keyof typeof RARITY_CONFIG] || RARITY_CONFIG.common;
                         toast.success(`Reward Unlocked: ${currentReward.name} (+${currentReward.value} credits)`, {
+                          id: `reward-toast-${myRun}`,
                           duration: 5000,
                           style: {
                             background: 'linear-gradient(135deg, rgba(249, 115, 22, 0.9), rgba(251, 146, 60, 0.8))',
