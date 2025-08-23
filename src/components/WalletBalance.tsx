@@ -53,17 +53,18 @@ export default function WalletBalance({
   const previousCredits = useRef<number>(0)
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasFetchedInitial = useRef<boolean>(false)
+  const currentAddressRef = useRef<string | null>(null)
 
-  // Hydrate from cached last known credits to avoid flashing 0 after sleep/tab-idle
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const cached = window.localStorage.getItem('lastKnownCredits')
+  // Hydrate from cached last known credits per-address once address is known
+  const hydrateFromCacheForAddress = useCallback((addr: string) => {
+    try {
+      const cached = window.localStorage.getItem(`lastKnownCredits:${addr}`)
       const cachedNum = cached != null ? Number(cached) : NaN
-      if (!Number.isNaN(cachedNum) && cachedNum > 0) {
+      if (!Number.isNaN(cachedNum) && cachedNum >= 0) {
         previousCredits.current = cachedNum
         setBalance(prev => ({ ...prev, credits: cachedNum }))
       }
-    }
+    } catch {}
   }, [])
 
   // Smooth credit animation when credits change
@@ -100,6 +101,8 @@ export default function WalletBalance({
       const vdata = await vres.json().catch(() => null)
       if (!vres.ok || !vdata?.token) return false
       try {
+        // Store token scoped to address and also set as current global
+        localStorage.setItem(`userToken:${wa}`, vdata.token)
         localStorage.setItem('userToken', vdata.token)
         window.dispatchEvent(new Event('user-token-set'))
       } catch {}
@@ -113,8 +116,11 @@ export default function WalletBalance({
     if (!connected) return 0
 
     try {
-      // Ensure JWT exists before calling protected endpoint
-      const token = typeof window !== 'undefined' ? localStorage.getItem('userToken') : null
+      // Ensure JWT exists before calling protected endpoint (prefer address-scoped token)
+      const waTokenKey = walletAddress ? `userToken:${walletAddress}` : null
+      const token = typeof window !== 'undefined'
+        ? (waTokenKey ? (localStorage.getItem(waTokenKey) || localStorage.getItem('userToken')) : localStorage.getItem('userToken'))
+        : null
       if (!token) {
         return previousCredits.current || 0
       }
@@ -150,7 +156,7 @@ export default function WalletBalance({
         }
         
         previousCredits.current = newCredits
-        try { localStorage.setItem('lastKnownCredits', String(newCredits)) } catch {}
+        try { if (walletAddress) localStorage.setItem(`lastKnownCredits:${walletAddress}`, String(newCredits)) } catch {}
         return newCredits
       }
     } catch (error) {
@@ -173,7 +179,7 @@ export default function WalletBalance({
         credits: expectedCredits,
         lastUpdate: Date.now()
       }))
-      try { localStorage.setItem('lastKnownCredits', String(expectedCredits)) } catch {}
+      try { if (currentAddressRef.current) localStorage.setItem(`lastKnownCredits:${currentAddressRef.current}`, String(expectedCredits)) } catch {}
       animateCreditsChange(expectedCredits, oldCredits)
       
       if (onCreditsChange) {
@@ -189,7 +195,7 @@ export default function WalletBalance({
         credits: actualCredits,
         lastUpdate: Date.now()
       }))
-      try { localStorage.setItem('lastKnownCredits', String(actualCredits)) } catch {}
+      try { if (currentAddressRef.current) localStorage.setItem(`lastKnownCredits:${currentAddressRef.current}`, String(actualCredits)) } catch {}
       
       if (onCreditsChange) {
         onCreditsChange(actualCredits)
@@ -263,7 +269,7 @@ export default function WalletBalance({
           loading: false,
           lastUpdate: Date.now()
         }
-        try { localStorage.setItem('lastKnownCredits', String(credits)) } catch {}
+        try { if (currentAddressRef.current) localStorage.setItem(`lastKnownCredits:${currentAddressRef.current}`, String(credits)) } catch {}
         return nextState
       })
 
@@ -281,6 +287,35 @@ export default function WalletBalance({
       }))
     }
   }, [connected, cardanoBalance, showCredits, fetchCredits, fetchAdaBalance]) // Removed onCreditsChange to prevent recreation
+
+  // Detect active address changes and reset caches/state
+  useEffect(() => {
+    let cancelled = false
+    const checkAddress = async () => {
+      if (!connected || !wallet) return
+      try {
+        const addrs = await wallet.getUsedAddresses()
+        const wa = Array.isArray(addrs) ? addrs[0] : addrs
+        if (wa && wa !== currentAddressRef.current) {
+          currentAddressRef.current = wa
+          previousCredits.current = 0
+          hasFetchedInitial.current = false
+          // Replace global token with scoped one if available; otherwise clear to force reverify
+          try {
+            const scoped = localStorage.getItem(`userToken:${wa}`)
+            if (scoped) localStorage.setItem('userToken', scoped)
+            else localStorage.removeItem('userToken')
+          } catch {}
+          // Hydrate from per-address cache and fetch fresh balances
+          hydrateFromCacheForAddress(wa)
+          fetchBalance(false)
+        }
+      } catch {}
+    }
+    checkAddress()
+    const interval = setInterval(checkAddress, 5000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [connected, wallet, fetchBalance, hydrateFromCacheForAddress])
 
   // Use external credits if provided, otherwise fetch them ONCE
   useEffect(() => {
