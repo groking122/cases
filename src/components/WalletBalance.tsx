@@ -116,26 +116,27 @@ export default function WalletBalance({
     if (!connected) return 0
 
     try {
+      // Resolve wallet address first
+      let walletAddressInner = externalWalletAddress
+      
+      // If no external wallet address provided, get it from the wallet
+      if (!walletAddressInner && wallet) {
+        const walletAddresses = await wallet.getUsedAddresses()
+        walletAddressInner = Array.isArray(walletAddresses) ? walletAddresses[0] : walletAddresses
+      }
+      
+      if (!walletAddressInner) {
+        console.error('❌ No wallet address available for credit fetch')
+        return 0
+      }
+      
       // Ensure JWT exists before calling protected endpoint (prefer address-scoped token)
-      const waTokenKey = walletAddress ? `userToken:${walletAddress}` : null
+      const waTokenKey = walletAddressInner ? `userToken:${walletAddressInner}` : null
       const token = typeof window !== 'undefined'
         ? (waTokenKey ? (localStorage.getItem(waTokenKey) || localStorage.getItem('userToken')) : localStorage.getItem('userToken'))
         : null
       if (!token) {
         return previousCredits.current || 0
-      }
-
-      let walletAddress = externalWalletAddress
-      
-      // If no external wallet address provided, get it from the wallet
-      if (!walletAddress && wallet) {
-        const walletAddresses = await wallet.getUsedAddresses()
-        walletAddress = Array.isArray(walletAddresses) ? walletAddresses[0] : walletAddresses
-      }
-      
-      if (!walletAddress) {
-        console.error('❌ No wallet address available for credit fetch')
-        return 0
       }
       
       let response = await authFetch('/api/get-credits', { method: 'POST' })
@@ -156,7 +157,7 @@ export default function WalletBalance({
         }
         
         previousCredits.current = newCredits
-        try { if (walletAddress) localStorage.setItem(`lastKnownCredits:${walletAddress}`, String(newCredits)) } catch {}
+        try { if (walletAddressInner) localStorage.setItem(`lastKnownCredits:${walletAddressInner}`, String(newCredits)) } catch {}
         return newCredits
       }
     } catch (error) {
