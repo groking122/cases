@@ -55,6 +55,15 @@ async function caseOpeningHandler(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Extra safety: ensure JWT wallet matches the DB user record
+    try {
+      const tokenWallet = (request as any)?.user?.wallet
+      if (tokenWallet && user.wallet_address && user.wallet_address !== tokenWallet) {
+        console.error('❌ Wallet mismatch between token and user record', { tokenWallet, userWallet: user.wallet_address })
+        return NextResponse.json({ error: 'wallet_mismatch' }, { status: 409 })
+      }
+    } catch {}
+
     console.log('👤 User found:', {
       id: user.id,
       username: user.username,
@@ -269,10 +278,9 @@ async function caseOpeningHandler(request: NextRequest) {
     const netResult = winnings - caseData.price;
     const isProfit = netResult > 0;
 
-    // Decide crediting vs inventory-only (NFT) based on symbol withdrawable/high value
-    const isWithdrawable = (selectedSymbol as any).withdrawable === true;
+    // Disable withdrawable items: always credit winnings to balance
     const isBigReward = selectedSymbol.multiplier >= 5.0;
-    let credited = !isWithdrawable; // do not auto-credit withdrawable items
+    const credited = true;
 
     // Restore stats calculations
     const newTotalSpent = user.total_spent + caseData.price;

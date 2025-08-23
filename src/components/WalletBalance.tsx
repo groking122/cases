@@ -54,17 +54,28 @@ export default function WalletBalance({
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hasFetchedInitial = useRef<boolean>(false)
 
-  // Hydrate from cached last known credits to avoid flashing 0 after sleep/tab-idle
+  // Hydrate from per-wallet cached credits to avoid flashing 0 after sleep/tab-idle
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const cached = window.localStorage.getItem('lastKnownCredits')
-      const cachedNum = cached != null ? Number(cached) : NaN
-      if (!Number.isNaN(cachedNum) && cachedNum > 0) {
-        previousCredits.current = cachedNum
-        setBalance(prev => ({ ...prev, credits: cachedNum }))
-      }
+    const hydrate = async () => {
+      if (typeof window === 'undefined') return
+      try {
+        let wa = externalWalletAddress
+        if (!wa && wallet) {
+          const addrs = await wallet.getUsedAddresses()
+          wa = Array.isArray(addrs) ? addrs[0] : addrs
+        }
+        if (!wa) return
+        const cacheKey = `lastKnownCredits:${wa}`
+        const cached = window.localStorage.getItem(cacheKey)
+        const cachedNum = cached != null ? Number(cached) : NaN
+        if (!Number.isNaN(cachedNum) && cachedNum >= 0) {
+          previousCredits.current = cachedNum
+          setBalance(prev => ({ ...prev, credits: cachedNum }))
+        }
+      } catch {}
     }
-  }, [])
+    void hydrate()
+  }, [externalWalletAddress, wallet])
 
   // Smooth credit animation when credits change
   const animateCreditsChange = (newCredits: number, oldCredits: number) => {
@@ -150,7 +161,10 @@ export default function WalletBalance({
         }
         
         previousCredits.current = newCredits
-        try { localStorage.setItem('lastKnownCredits', String(newCredits)) } catch {}
+        try {
+          const cacheKey = `lastKnownCredits:${walletAddress}`
+          localStorage.setItem(cacheKey, String(newCredits))
+        } catch {}
         return newCredits
       }
     } catch (error) {
@@ -173,7 +187,14 @@ export default function WalletBalance({
         credits: expectedCredits,
         lastUpdate: Date.now()
       }))
-      try { localStorage.setItem('lastKnownCredits', String(expectedCredits)) } catch {}
+      try {
+        let wa = externalWalletAddress
+        if (!wa && wallet) {
+          const addrs = await wallet.getUsedAddresses()
+          wa = Array.isArray(addrs) ? addrs[0] : addrs
+        }
+        if (wa) localStorage.setItem(`lastKnownCredits:${wa}`, String(expectedCredits))
+      } catch {}
       animateCreditsChange(expectedCredits, oldCredits)
       
       if (onCreditsChange) {
@@ -189,7 +210,14 @@ export default function WalletBalance({
         credits: actualCredits,
         lastUpdate: Date.now()
       }))
-      try { localStorage.setItem('lastKnownCredits', String(actualCredits)) } catch {}
+      try {
+        let wa = externalWalletAddress
+        if (!wa && wallet) {
+          const addrs = await wallet.getUsedAddresses()
+          wa = Array.isArray(addrs) ? addrs[0] : addrs
+        }
+        if (wa) localStorage.setItem(`lastKnownCredits:${wa}`, String(actualCredits))
+      } catch {}
       
       if (onCreditsChange) {
         onCreditsChange(actualCredits)
@@ -263,7 +291,14 @@ export default function WalletBalance({
           loading: false,
           lastUpdate: Date.now()
         }
-        try { localStorage.setItem('lastKnownCredits', String(credits)) } catch {}
+        try {
+          let wa = externalWalletAddress
+          if (!wa && wallet) {
+            const addrs = await wallet.getUsedAddresses()
+            wa = Array.isArray(addrs) ? addrs[0] : addrs
+          }
+          if (wa) localStorage.setItem(`lastKnownCredits:${wa}`, String(credits))
+        } catch {}
         return nextState
       })
 

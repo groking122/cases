@@ -39,6 +39,18 @@ export default function CreditsPage() {
       const walletAddress = addresses[0]
       setWalletAddress(walletAddress)
       
+      // Detect wallet switch and clear stale auth
+      try {
+        const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
+        if (lastWalletAddress && lastWalletAddress !== walletAddress) {
+          localStorage.removeItem('userToken')
+          try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
+        }
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('lastWalletAddress', walletAddress)
+        }
+      } catch {}
+      
 
       // Hydrate from per-wallet cache immediately to avoid flashing 0
       try {
