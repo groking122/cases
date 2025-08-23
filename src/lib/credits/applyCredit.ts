@@ -7,7 +7,8 @@ export async function applyCredit(userId: string, delta: bigint, reason: string,
 
   const { data, error } = await supabaseAdmin.rpc('credit_apply_and_log', {
     p_user_id: userId,
-    p_delta: delta.toString(),
+    // Pass numeric to avoid PostgREST type ambiguity
+    p_delta: Number(delta),
     p_reason: reason,
     p_key: key ?? null
   })
