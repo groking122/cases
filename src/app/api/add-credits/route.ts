@@ -118,49 +118,49 @@ export async function POST(request: NextRequest) {
       let lastStatus = 0
       let lastBody: any = null
 
-      while (attempt < maxAttempts) {
-        const res = await fetch(`${origin}/api/verify-payment`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            txHash,
-            expectedAmount: paymentAmount,
-            expectedAddress: paymentAddress
+        while (attempt < maxAttempts) {
+          const res = await fetch(`${origin}/api/verify-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              txHash,
+              expectedAmount: paymentAmount,
+              expectedAddress: paymentAddress
+            })
           })
-        })
-        lastStatus = res.status
-        try { lastBody = await res.json() } catch { lastBody = null }
+          lastStatus = res.status
+          try { lastBody = await res.json() } catch { lastBody = null }
 
-        if (res.ok && lastBody?.success && lastBody?.verified) {
-          verifiedOk = true
+          if (res.ok && lastBody?.success && lastBody?.verified) {
+            verifiedOk = true
+            break
+          }
+
+          // Pending or not found → backoff and retry
+          if (res.status === 202 || res.status === 404 || (lastBody && (lastBody.status === 'pending'))) {
+            const delayMs = Math.min(Math.pow(2, attempt) * 1000, 16000)
+            console.log(`⏳ Waiting ${delayMs}ms before re-verify (attempt ${attempt + 1}/${maxAttempts})`)
+            await new Promise(r => setTimeout(r, delayMs))
+            attempt++
+            continue
+          }
+
+          // Hard error (auth, misconfig, etc.)
           break
         }
 
-        // Pending or not found → backoff and retry
-        if (res.status === 202 || res.status === 404 || (lastBody && (lastBody.status === 'pending'))) {
-          const delayMs = Math.min(Math.pow(2, attempt) * 1000, 16000)
-          console.log(`⏳ Waiting ${delayMs}ms before re-verify (attempt ${attempt + 1}/${maxAttempts})`)
-          await new Promise(r => setTimeout(r, delayMs))
-          attempt++
-          continue
+        if (!verifiedOk) {
+          // Still pending or failed after retries → signal client to poll
+          console.warn('⚠️ Verification pending/failed after retries', { lastStatus, lastBody })
+          return NextResponse.json({ status: 'pending', retryAfter: 5 }, { status: 202 })
         }
 
-        // Hard error (auth, misconfig, etc.)
-        break
-      }
-
-      if (!verifiedOk) {
-        // Still pending or failed after retries → signal client to poll
-        console.warn('⚠️ Verification pending/failed after retries', { lastStatus, lastBody })
-        return NextResponse.json({ status: 'pending', retryAfter: 5 }, { status: 202 })
-      }
-
-      console.log('✅ Transaction verified on blockchain')
+        console.log('✅ Transaction verified on blockchain')
       
     } catch (verificationError: any) {
       console.error('❌ Transaction verification error:', verificationError)
       return NextResponse.json(
-        { error: 'Failed to verify transaction on blockchain' },
+        { error: 'Failed to verify transaction on blockchain', code: 'VERIFY_FAILED', details: verificationError?.message || String(verificationError) },
         { status: 500 }
       )
     }
@@ -260,7 +260,16 @@ export async function POST(request: NextRequest) {
     const bonus = (!user.welcome_bonus_claimed && oldBalance === 0n) ? 100n : 0n
 
     const idemKey = `purchase:${txHash}`
-    const newBalance = await applyCredit(user.id, base + bonus, 'credit_purchase', idemKey)
+    let newBalance: bigint
+    try {
+      newBalance = await applyCredit(user.id, base + bonus, 'credit_purchase', idemKey)
+    } catch (rpcError: any) {
+      console.error('❌ credit_apply_and_log RPC error:', rpcError)
+      return NextResponse.json(
+        { error: 'Database RPC failed', code: 'RPC_FAILED', details: rpcError?.message || String(rpcError) },
+        { status: 500 }
+      )
+    }
 
     // Record the credit transaction
     console.log('📝 Recording transaction...')
@@ -286,7 +295,7 @@ export async function POST(request: NextRequest) {
       await applyCredit(user.id, rollbackDelta, 'purchase_rollback', rollbackKey)
         
       return NextResponse.json(
-        { error: 'Failed to record transaction. Credits have been rolled back.' },
+        { error: 'Failed to record transaction. Credits have been rolled back.', code: 'TX_INSERT_FAILED', details: transactionError?.message || String(transactionError) },
         { status: 500 }
       )
     }
