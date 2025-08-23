@@ -131,7 +131,9 @@ export default function Home() {
       try {
         const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
         if (lastWalletAddress && lastWalletAddress !== walletAddress) {
+          // Clear local token and server cookie
           localStorage.removeItem('userToken')
+          try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
         }
         if (typeof window !== 'undefined') {
           localStorage.setItem('lastWalletAddress', walletAddress)
@@ -212,6 +214,7 @@ export default function Home() {
         const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
         if (lastWalletAddress && lastWalletAddress !== walletAddress) {
           localStorage.removeItem('userToken')
+          try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
         }
         if (typeof window !== 'undefined') {
           localStorage.setItem('lastWalletAddress', walletAddress)
@@ -423,6 +426,7 @@ export default function Home() {
         const lastWalletAddress = typeof window !== 'undefined' ? localStorage.getItem('lastWalletAddress') : null
         if (lastWalletAddress && lastWalletAddress !== walletAddress) {
           localStorage.removeItem('userToken')
+          try { await fetch('/api/auth/logout', { method: 'POST' }) } catch {}
         }
         if (typeof window !== 'undefined') {
           localStorage.setItem('lastWalletAddress', walletAddress)
