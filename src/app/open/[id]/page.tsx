@@ -139,7 +139,12 @@ export default function OpenCasePage() {
   }, [connected, wallet, caseData])
 
   const handleComplete = useCallback((result: any) => {
-    // Refresh balance after case opening - notification handled by component
+    // Instant UI update if API returned newBalance; also trigger background refresh
+    try {
+      if (result?.apiResult?.newBalance !== undefined) {
+        setUserCredits(Number(result.apiResult.newBalance))
+      }
+    } catch {}
     setRefreshTrigger(prev => prev + 1)
   }, [])
 

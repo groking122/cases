@@ -30,7 +30,7 @@
 ### 4. API Route Conflicts
 **Problem**: Routes still using deprecated `skins` table instead of new `symbols` table.
 
-**Fix**: Updated `/api/open-case` route to:
+**Fix**: Use `/api/open-case-credits` (the old `/api/open-case` was outdated and does not affect credit balances).
 - Use `symbols` table with `case_symbols` relationships
 - Query with proper SQL joins
 - Return consistent symbol data structure

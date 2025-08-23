@@ -103,7 +103,8 @@ async function caseOpeningHandler(request: NextRequest) {
       .eq('user_id', userId)
       .single()
 
-    let currentBalance = BigInt(String(balanceRow?.amount ?? 0))
+    const balanceBefore = BigInt(String(balanceRow?.amount ?? 0))
+    let currentBalance = balanceBefore
 
     // Check if user has enough credits using balances table (fast-fail)
     if (currentBalance < BigInt(caseData.price)) {
@@ -123,6 +124,7 @@ async function caseOpeningHandler(request: NextRequest) {
     // Generate server seed
     const serverSeed = generateServerSeed();
     const nonce = user.cases_opened + 1;
+    const roundKey = `${nonce}-${serverSeed.slice(0, 16)}`
 
     console.log('🎲 Generating random result...', {
       serverSeed: serverSeed.substring(0, 10) + '...',
@@ -288,13 +290,12 @@ async function caseOpeningHandler(request: NextRequest) {
     const newCasesOpened = user.cases_opened + 1;
 
     // Apply atomic, idempotent credit changes via single DB function
-    const roundId = `${nonce}`
-    // 1) Deduct case price
-    currentBalance = await applyCredit(userId, -BigInt(caseData.price), `bet:case:${caseId}`, `bet:${roundId}`)
+    // 1) Deduct case price (idempotent on roundKey)
+    currentBalance = await applyCredit(userId, -BigInt(caseData.price), `bet:case:${caseId}`, `bet:${roundKey}`)
 
     // 2) Optionally credit winnings
     if (credited && winnings > 0) {
-      currentBalance = await applyCredit(userId, BigInt(winnings), `win:case:${caseId}`, `win:${roundId}`)
+      currentBalance = await applyCredit(userId, BigInt(winnings), `win:case:${caseId}`, `win:${roundKey}`)
     }
 
     // Update user record (stats only; credits managed in balances table)
@@ -402,6 +403,13 @@ async function caseOpeningHandler(request: NextRequest) {
       netResult,
       isProfit,
       newBalance: amountToJSON(currentBalance),
+      balanceBefore: amountToJSON(balanceBefore),
+      debug: {
+        roundKey,
+        casePrice: caseData.price,
+        credited,
+        userId
+      },
       credited,
       isBigReward,
       caseOpening: {

@@ -111,7 +111,7 @@ CREATE TABLE case_openings (
 - `POST /api/upload-image` - Upload images to Supabase Storage
 
 #### **4. Game API Routes:**
-- `POST /api/open-case` - Open case with ADA payment
+- `POST /api/open-case-credits` - Open case using credits (deducts cost, credits winnings)
 - `POST /api/open-case-credits` - Open case with credits ⚠️ **MAIN ROUTE**
 - `GET /api/cases` - List active cases for players
 

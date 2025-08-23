@@ -284,7 +284,7 @@ export interface UserInventory {
 ## 🔄 Step 5: Create API Routes (8 minutes)
 
 ### 5.1 Case Opening API
-Create `src/app/api/open-case/route.ts`:
+Create `src/app/api/open-case-credits/route.ts`:
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server'
@@ -660,7 +660,7 @@ export default function Home() {
       setSpinningItems(spinItems)
       
       // Call backend API
-      const response = await fetch('/api/open-case', {
+      const response = await fetch('/api/open-case-credits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
