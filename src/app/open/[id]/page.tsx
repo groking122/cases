@@ -228,7 +228,7 @@ export default function OpenCasePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-card/60 rounded-2xl border border-border p-6 md:p-8"
+            className="bg-card/60 rounded-2xl border border-border p-6 md:p-10"
           >
             <EnhancedCaseOpening
                               selectedCase={{ 

@@ -259,7 +259,7 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
           ) : stage === 'opening' ? (
             <OpeningCase selectedCase={selectedCase} />
           ) : stage === 'spinning' ? (
-            <div className="w-full max-w-md sm:max-w-4xl mx-auto">
+            <div className="w-full max-w-lg sm:max-w-5xl mx-auto">
               <SpinningReelCarousel 
                 isSpinning={true}
                 winningItem={reward ? {

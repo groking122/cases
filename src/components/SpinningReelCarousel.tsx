@@ -34,7 +34,7 @@ export function SpinningReelCarousel({
   const hasCompletedRef = useRef(false)
   // Responsive sizing for mobile
   const isMobile = typeof window !== 'undefined' ? window.innerWidth < 640 : false
-  const itemWidth = isMobile ? 88 : 120
+  const itemWidth = isMobile ? 100 : 140
   const visibleItems = isMobile ? 5 : 7
   const { canUseComplexEffects } = useDeviceCapabilities()
   
@@ -267,7 +267,7 @@ export function SpinningReelCarousel({
 
   console.log('🎰 Rendering carousel with', reelItems.current.length, 'items')
 
-  const containerHeights = compact ? 'h-40' : 'h-52 sm:h-64'
+  const containerHeights = compact ? 'h-44' : 'h-60 sm:h-72'
 
   return (
     <div className={`relative w-full ${containerHeights} overflow-hidden bg-gradient-to-r from-gray-900/80 via-black to-gray-800/80 rounded-2xl border-4 border-orange-500/60 shadow-2xl`}>
@@ -349,7 +349,7 @@ export function SpinningReelCarousel({
               }`}
               style={{ 
                 width: itemWidth - 8, 
-                height: isMobile ? 140 : 180
+                height: isMobile ? 160 : 200
               }}
               whileHover={{ rotateX: 6, rotateY: 6, scale: 1.03 }}
               animate={
@@ -381,7 +381,7 @@ export function SpinningReelCarousel({
             >
               <div className="flex flex-col items-center justify-center h-full p-3">
                 <motion.div 
-                  className={`w-16 h-16 mb-2 flex items-center justify-center transition-all duration-300 ${
+                  className={`w-20 h-20 mb-2 flex items-center justify-center transition-all duration-300 ${
                     isInCelebration ? 'drop-shadow-lg' : ''
                   }`}
                   animate={
@@ -415,7 +415,7 @@ export function SpinningReelCarousel({
                       imageUrl: item.symbol.imageUrl || null,
                       rarity: item.rarity
                     }}
-                    size={isMobile ? 52 : 64}
+                    size={isMobile ? 64 : 80}
                     showRarityLabel={false}
                   />
                   {/* Glass reflection overlay */}

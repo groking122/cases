@@ -787,7 +787,7 @@ export default function Home() {
                 whileHover={{ scale: 1.02, y: -5 }}
                 onClick={() => router.push(`/open/${caseItem.id}`)}
               >
-                <div className="h-56 bg-gradient-to-br from-orange-900/40 to-red-900/40 flex items-center justify-center relative overflow-hidden">
+                <div className="h-64 bg-gradient-to-br from-orange-900/40 to-red-900/40 flex items-center justify-center relative overflow-hidden">
                   {caseItem.image_url ? (
                     <motion.img
                       src={caseItem.image_url}

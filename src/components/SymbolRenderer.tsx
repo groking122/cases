@@ -21,7 +21,7 @@ interface SymbolRendererProps {
 
 const SymbolRenderer = ({ 
   symbol, 
-  size = 100,
+  size = 112,
   revealAnimation = false,
   className = "",
   showRarityLabel = true,
