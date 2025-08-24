@@ -37,45 +37,51 @@ export default function AdminDashboard() {
     try {
       setIsLoading(true)
       
+      // Hydrate symbols from local cache immediately to avoid blank state
+      try {
+        const cached = localStorage.getItem('admin:symbolsCache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed.items)) {
+            setSymbols(parsed.items)
+          }
+        }
+      } catch {}
+
       // DEVELOPMENT BYPASS - Set a fake admin token for development
       if (process.env.NODE_ENV === 'development' && !localStorage.getItem('adminToken')) {
         console.log('🔓 Development mode: Setting fake admin token')
         localStorage.setItem('adminToken', 'dev-admin-token')
       }
       
-      // Load stats with better error handling
-      const statsResponse = await fetch('/api/admin/stats', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      })
-      if (statsResponse.status === 401 || statsResponse.status === 403) {
+      // Fetch stats, cases, symbols in parallel
+      const headers = {
+        'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+        'Cache-Control': 'no-cache'
+      }
+
+      const [statsResponse, casesResponse, symbolsResponse] = await Promise.all([
+        fetch('/api/admin/stats', { headers }),
+        fetch(`/api/admin/cases?_=${Date.now()}`, { headers }),
+        fetch(`/api/admin/symbols?_=${Date.now()}`, { headers })
+      ])
+
+      // Auth handling per response
+      if ([statsResponse, casesResponse, symbolsResponse].some(r => r.status === 401 || r.status === 403)) {
         localStorage.removeItem('adminToken')
         router.push('/admin/login')
         return
       }
+
+      // Stats
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
-        console.log('✅ Stats loaded:', statsData)
         setStats(statsData.data || {})
       } else {
         console.error('❌ Failed to load stats:', statsResponse.status, statsResponse.statusText)
-        const errorText = await statsResponse.text()
-        console.error('Stats error details:', errorText)
       }
 
-      // Load cases with cache busting
-      const casesResponse = await fetch(`/api/admin/cases?_=${Date.now()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-          'Cache-Control': 'no-cache'
-        }
-      })
-      if (casesResponse.status === 401 || casesResponse.status === 403) {
-        localStorage.removeItem('adminToken')
-        router.push('/admin/login')
-        return
-      }
+      // Cases
       if (casesResponse.ok) {
         const casesData = await casesResponse.json()
         setCases(casesData.data.items)
@@ -83,21 +89,13 @@ export default function AdminDashboard() {
         console.error('Failed to load cases:', casesResponse.status, casesResponse.statusText)
       }
 
-      // Load symbols with cache busting
-      const symbolsResponse = await fetch(`/api/admin/symbols?_=${Date.now()}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-          'Cache-Control': 'no-cache'
-        }
-      })
-      if (symbolsResponse.status === 401 || symbolsResponse.status === 403) {
-        localStorage.removeItem('adminToken')
-        router.push('/admin/login')
-        return
-      }
+      // Symbols (update state and cache)
       if (symbolsResponse.ok) {
         const symbolsData = await symbolsResponse.json()
         setSymbols(symbolsData.data.items)
+        try {
+          localStorage.setItem('admin:symbolsCache', JSON.stringify({ items: symbolsData.data.items, ts: Date.now() }))
+        } catch {}
       } else {
         console.error('Failed to load symbols:', symbolsResponse.status, symbolsResponse.statusText)
       }
@@ -132,7 +130,7 @@ export default function AdminDashboard() {
       {/* Header */}
       <header className="bg-card border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">🎰 Case Opening Admin</h1>
+          <h1 className="text-h2 font-bold">🎰 Case Opening Admin</h1>
           <div className="flex items-center space-x-4">
             <span className="text-foreground/70">Welcome, Admin</span>
             <button 
@@ -183,7 +181,7 @@ export default function AdminDashboard() {
           {activeTab === 'cases' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Case Management</h2>
+                <h2 className="text-h3 font-semibold">Case Management</h2>
                 <button
                   onClick={() => setSelectedCase({} as CaseConfig)}
                   className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg"

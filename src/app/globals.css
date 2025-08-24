@@ -87,6 +87,14 @@ html, body {
   .bg-gradient-radial {
     background: radial-gradient(circle, var(--tw-gradient-stops));
   }
+  /* Typography remapping to semantic scale */
+  .text-6xl { @apply text-h1 !important; }
+  .text-5xl { @apply text-h1 !important; }
+  .text-4xl { @apply text-h2 !important; }
+  .text-3xl { @apply text-h3 !important; }
+  .text-2xl { @apply text-h4 !important; }
+  .text-xl  { @apply text-h4 !important; }
+  .text-base { @apply text-body !important; }
   
   .text-shadow {
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);

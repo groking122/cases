@@ -518,7 +518,7 @@ export default function Home() {
         <div className="max-w-lg w-full">
           <div className="bg-card/60 backdrop-blur-md rounded-2xl p-8 border border-border shadow-2xl">
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
+              <h1 className="text-h1 font-bold mb-4 bg-gradient-to-r from-orange-400 to-orange-600 bg-clip-text text-transparent">
                 FudCoin
               </h1>
               <p className="text-foreground/70 text-lg">
@@ -764,7 +764,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background"></div>
         <div className="relative max-w-7xl mx-auto px-4">
           <motion.h2 
-            className="text-3xl font-bold text-center mb-12 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent"
+            className="text-h2 font-bold text-center mb-12 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent"
             initial={{ y: 50, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
