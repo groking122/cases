@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 import { EnhancedCaseOpening } from '@/components/EnhancedCaseOpening'
 import WalletSelector from '@/components/WalletSelector'
 import ThemeToggle from '@/components/ThemeToggle'
+import CaseOddsModal from '@/components/CaseOddsModal'
 import RulesPopup from '@/components/RulesPopup'
 import { authFetch } from '@/lib/authFetch'
 
@@ -18,6 +19,7 @@ export default function OpenCasePage() {
   const [userCredits, setUserCredits] = useState<number | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [showRules, setShowRules] = useState(false)
+  const [oddsOpen, setOddsOpen] = useState(false)
 
   const [caseData, setCaseData] = useState<any | null>(null)
   const [loading, setLoading] = useState(true)
@@ -175,6 +177,14 @@ export default function OpenCasePage() {
           </button>
           <div className="flex items-center gap-3">
             <ThemeToggle />
+            {caseData && (
+              <button
+                onClick={() => setOddsOpen(true)}
+                className="px-3 py-2 rounded-lg border border-border text-xs text-foreground/80 hover:bg-foreground/5"
+              >
+                View Odds
+              </button>
+            )}
             <button
               onClick={() => setShowRules(true)}
               className="px-3 py-2 rounded-lg text-xs font-semibold border border-border"
@@ -240,6 +250,7 @@ export default function OpenCasePage() {
           </motion.div>
         )}
       </div>
+      <CaseOddsModal isOpen={oddsOpen} onClose={() => setOddsOpen(false)} caseName={caseData?.name || ''} symbols={(caseData?.symbols || []) as any} />
     </div>
   )
 }

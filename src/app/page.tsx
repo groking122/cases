@@ -20,6 +20,7 @@ import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
 import RulesPopup from '@/components/RulesPopup'
 import { authFetch } from '@/lib/authFetch'
+import CaseOddsModal from '@/components/CaseOddsModal'
 
 
 interface Skin {
@@ -102,6 +103,7 @@ export default function Home() {
   const [showCreditsPopup, setShowCreditsPopup] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showRules, setShowRules] = useState(false)
+  const [oddsModal, setOddsModal] = useState<{ open: boolean, caseName: string, symbols: any[] }>({ open: false, caseName: '', symbols: [] })
   
 
 
@@ -829,14 +831,22 @@ export default function Home() {
                     <span className="text-lg font-bold text-yellow-400">
                       {caseItem.price} Credits
                     </span>
-                    <motion.button
-                      className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-orange-500 hover:to-orange-400 transition-all"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={(e) => { e.stopPropagation(); router.push(`/open/${caseItem.id}`) }}
-                    >
-                      Open Case
-                    </motion.button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-3 py-2 rounded-lg border border-border text-xs text-foreground/80 hover:bg-foreground/5"
+                        onClick={(e) => { e.stopPropagation(); setOddsModal({ open: true, caseName: caseItem.name, symbols: caseItem.symbols || [] }) }}
+                      >
+                        View Odds
+                      </button>
+                      <motion.button
+                        className="bg-gradient-to-r from-orange-600 to-orange-500 text-white px-4 py-2 rounded-lg font-medium hover:from-orange-500 hover:to-orange-400 transition-all"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={(e) => { e.stopPropagation(); router.push(`/open/${caseItem.id}`) }}
+                      >
+                        Open Case
+                      </motion.button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -844,6 +854,7 @@ export default function Home() {
           </div>
         </div>
       </section>
+      <CaseOddsModal isOpen={oddsModal.open} onClose={() => setOddsModal(v => ({ ...v, open: false }))} caseName={oddsModal.caseName} symbols={oddsModal.symbols as any} />
 
       {/* Case Opening Animation Section removed - opening happens on dedicated page */}
 
