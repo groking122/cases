@@ -207,7 +207,7 @@ export default function OpenCasePage() {
       {/* Spacer for fixed header */}
       <div className="h-14" />
 
-      <div className="relative max-w-5xl mx-auto px-4 py-6">
+      <div className="relative max-w-7xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="text-sm text-foreground/70"><span className="text-h3 font-semibold mr-2">{caseData.name}</span>• {caseData.price} credits{userCredits !== null ? ` • Balance: ${userCredits}` : ''}</div>
         </div>
