@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins, JetBrains_Mono, Nunito } from "next/font/google";
+import { Poppins, JetBrains_Mono, Nunito, Handlee, Rubik } from "next/font/google";
 import "./globals.css";
 import { Toaster } from 'react-hot-toast';
 import { MeshWalletProvider } from "@/components/MeshWalletProvider";
@@ -24,6 +24,20 @@ const nunito = Nunito({
   display: 'swap',
 });
 
+const handlee = Handlee({
+  subsets: ["latin"],
+  variable: "--font-handlee",
+  weight: "400",
+  display: 'swap',
+});
+
+const rubik = Rubik({
+  subsets: ["latin"],
+  variable: "--font-rubik",
+  weight: ["400", "700"],
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: "FudCoin",
   description: "Premium case opening experience with blockchain security powered by FudCoin",
@@ -42,7 +56,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${poppins.variable} ${jetbrainsMono.variable} ${nunito.variable} font-sans antialiased`}
+        className={`${poppins.variable} ${jetbrainsMono.variable} ${nunito.variable} ${handlee.variable} ${rubik.variable} font-sans antialiased`}
       >
         {/* Early theme application to avoid flash */}
         <script

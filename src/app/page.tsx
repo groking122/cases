@@ -564,20 +564,20 @@ export default function Home() {
           </motion.div>
 
           {/* Navigation Links - Centered (desktop) */}
-          <nav className="hidden md:flex items-center gap-8 flex-1 justify-center">
+          <nav className="hidden md:flex items-center gap-8 flex-1 justify-center font-poppins font-bold text-lg">
             <motion.a 
               href="#cases" 
-              className="text-sm text-foreground/70 hover:text-foreground transition-colors"
+              className="text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Cases
             </motion.a>
-            <Link href="/inventory" className="text-sm text-foreground/70 hover:text-foreground transition-colors">
+            <Link href="/inventory" className="text-foreground/70 hover:text-foreground transition-colors">
               <motion.span whileHover={{ scale: 1.1 }}>Stash</motion.span>
             </Link>
             <motion.button 
               onClick={() => setShowRules(true)} 
-              className="text-sm text-foreground/70 hover:text-foreground transition-colors"
+              className="text-foreground/70 hover:text-foreground transition-colors"
               whileHover={{ scale: 1.1 }}
             >
               Rules
@@ -646,10 +646,10 @@ export default function Home() {
             </button>
             {mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 mt-2 bg-card/90 border border-border rounded-xl p-3 shadow-2xl">
-                <div className="flex flex-col gap-2">
-                  <a href="#cases" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Cases</a>
-                  <Link href="/inventory" className="px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Stash</Link>
-                  <button onClick={() => { setMobileMenuOpen(false); setShowRules(true) }} className="text-left px-2 py-2 rounded-md text-sm text-foreground/90 hover:bg-foreground/5">Rules</button>
+                <div className="flex flex-col gap-2 font-poppins font-bold">
+                  <a href="#cases" className="px-2 py-2 rounded-md text-lg text-foreground/90 hover:bg-foreground/5">Cases</a>
+                  <Link href="/inventory" className="px-2 py-2 rounded-md text-lg text-foreground/90 hover:bg-foreground/5">Stash</Link>
+                  <button onClick={() => { setMobileMenuOpen(false); setShowRules(true) }} className="text-left px-2 py-2 rounded-md text-lg text-foreground/90 hover:bg-foreground/5">Rules</button>
                   <div className="border-t border-gray-800 my-2" />
                   <div className="px-1">
                     <WalletBalance
@@ -747,7 +747,7 @@ export default function Home() {
               const casesSection = document.getElementById('cases');
               casesSection?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white px-12 py-4 rounded-xl font-bold text-xl shadow-2xl transform transition-all duration-300"
+            className="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white px-8 sm:px-10 py-3 sm:py-3.5 rounded-xl font-rubik font-bold text-[clamp(1rem,0.5vw+0.9rem,1.125rem)] shadow-2xl transform transition-all duration-300"
             whileHover={{ scale: 1.1, y: -5 }}
             whileTap={{ scale: 0.95 }}
             initial={{ y: 50, opacity: 0 }}
@@ -764,13 +764,14 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-background"></div>
         <div className="relative max-w-7xl mx-auto px-4">
           <motion.h2 
-            className="text-h2 font-bold text-center mb-12 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent"
+            className="text-[clamp(1.625rem,1.2rem+1vw,1.75rem)] font-bold text-center mb-4 bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent"
             initial={{ y: 50, opacity: 0 }}
             whileInView={{ y: 0, opacity: 1 }}
             viewport={{ once: true }}
           >
                             Available Cases
           </motion.h2>
+          <div className="mx-auto mb-10 h-1 w-24 bg-gradient-to-r from-red-500 to-orange-500 rounded-full" />
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
             {availableCases.map((caseItem, index) => (
@@ -813,7 +814,7 @@ export default function Home() {
                   )}
                   {/* Overlay with case price */}
                   <div className="absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-background/20"></div>
-                  <div className="absolute top-3 right-3 bg-orange-500/90 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                  <div className="absolute top-3 right-3 bg-orange-500/90 text-white px-3 py-1 rounded-full text-[14px] font-rubik font-bold uppercase tracking-wide">
                     {caseItem.price} Credits
                   </div>
                 </div>

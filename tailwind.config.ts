@@ -12,6 +12,8 @@ const config: Config = {
 			fontFamily: {
 				'poppins': ['var(--font-poppins)', 'system-ui', 'sans-serif'],
 				'jetbrains': ['var(--font-jetbrains)', 'monospace'],
+				'handlee': ['var(--font-handlee)', 'cursive'],
+				'rubik': ['var(--font-rubik)', 'sans-serif'],
 				'sans': ['var(--font-poppins)', 'system-ui', 'sans-serif'],
 				'mono': ['var(--font-jetbrains)', 'monospace'],
 			},

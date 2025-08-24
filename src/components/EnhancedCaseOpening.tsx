@@ -362,17 +362,17 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
         </motion.div>
       </AnimatePresence>
 
-      {/* Action Button with orange theme */}
+      {/* Action Button with hero CTA sizing */}
       <div className="w-full max-w-sm sm:max-w-md">
         <LoadingButton
           isLoading={isProcessing}
           loadingText={getLoadingText(stage)}
           onClick={handleOpenCase}
           disabled={isDisabled}
-          className={`w-full h-12 sm:h-16 text-base sm:text-xl font-bold transition-all duration-300 relative overflow-hidden rounded-xl ${
+          className={`w-full rounded-xl font-rubik font-bold text-[clamp(1rem,0.5vw+0.9rem,1.125rem)] px-8 sm:px-10 py-3 sm:py-3.5 transition-all duration-300 relative overflow-hidden ${
             isDisabled 
-              ? 'bg-gray-700 text-gray-400 cursor-not-allowed border-2 border-gray-600' 
-              : 'bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 text-white shadow-lg hover:shadow-xl border-2 border-orange-500/50 hover:border-orange-400 transform hover:scale-[1.02] active:scale-[0.98]'
+              ? 'bg-gray-700 text-gray-400 cursor-not-allowed border border-gray-600' 
+              : 'bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 text-white shadow-2xl hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.5)] border border-orange-500/50 transform hover:scale-[1.02] active:scale-[0.98]'
           }`}
         >
           {/* Shimmer effect on hover */}
