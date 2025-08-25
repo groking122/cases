@@ -11,8 +11,10 @@ async function handler(request: any) {
     const userId = (request as any)?.user?.id
     const { sessionId, switch: doSwitch } = await request.json()
     if (!sessionId || typeof doSwitch !== 'boolean') return NextResponse.json({ error: 'bad_request' }, { status: 400 })
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Database configuration error' }, { status: 500 })
+    const sb = supabaseAdmin
 
-    const { data: s, error } = await supabaseAdmin
+    const { data: s, error } = await sb
       .from('monty_sessions')
       .select('*')
       .eq('id', sessionId)

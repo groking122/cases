@@ -17,6 +17,7 @@ async function handler(request: any) {
     const serverSeed = newServerSeed()
     const serverSeedHash = sha256(serverSeed)
 
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Database configuration error' }, { status: 500 })
     const { data, error } = await supabaseAdmin
       .from('monty_sessions')
       .insert({

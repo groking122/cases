@@ -10,6 +10,7 @@ async function handler(request: any) {
       return NextResponse.json({ error: 'bad_request' }, { status: 400 })
     }
 
+    if (!supabaseAdmin) return NextResponse.json({ error: 'Database configuration error' }, { status: 500 })
     const { data: s, error } = await supabaseAdmin
       .from('monty_sessions')
       .select('*')

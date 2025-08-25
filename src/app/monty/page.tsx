@@ -7,6 +7,7 @@ export default function MontyPage() {
   const [revealDoor, setRevealDoor] = useState<number | null>(null)
   const [firstPick, setFirstPick] = useState<number | null>(null)
   const [result, setResult] = useState<any>(null)
+  const [assets, setAssets] = useState<{[k:string]: string}>({})
 
   const start = async () => {
     setResult(null)
@@ -43,7 +44,11 @@ export default function MontyPage() {
               onClick={() => pick(d)}
               className={`p-6 rounded-xl border ${revealDoor === d ? 'border-red-500 bg-red-500/10' : 'border-border bg-card/60'}`}
             >
-              Door {d + 1}
+              {assets.closed ? (
+                <img src={assets.closed} alt={`Door ${d+1}`} className="w-full h-32 object-cover rounded" />
+              ) : (
+                <>Door {d + 1}</>
+              )}
             </button>
           ))}
         </div>
