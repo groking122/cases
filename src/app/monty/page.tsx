@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { authFetch } from '@/lib/authFetch'
+import { playSound } from '@/lib/soundManager'
 
 export default function MontyPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -14,6 +15,7 @@ export default function MontyPage() {
   const [credits, setCredits] = useState<number | null>(null)
   const [assetsReady, setAssetsReady] = useState<boolean>(false)
   const [rehydrated, setRehydrated] = useState<boolean>(false)
+  const [pickOverlayDoor, setPickOverlayDoor] = useState<number | null>(null)
 
   // Load assets + toggle on mount
   useEffect(() => {
@@ -78,6 +80,7 @@ export default function MontyPage() {
   }
 
   const start = async () => {
+    try { await playSound('buttonClick') } catch {}
     setResult(null)
     setRevealDoor(null)
     setFirstPick(null)
@@ -97,17 +100,34 @@ export default function MontyPage() {
   const pick = async (door: number) => {
     if (!sessionId) return
     setFirstPick(door)
+    // brief open-frame overlay animation on the picked door
+    setPickOverlayDoor(door)
+    setTimeout(() => setPickOverlayDoor((cur) => (cur === door ? null : cur)), 700)
+    try { await playSound('caseOpen') } catch {}
     const r = await fetch('/api/monty/pick', { method: 'POST', body: JSON.stringify({ sessionId, firstPick: door }) })
     const j = await r.json()
-    if (r.ok) setRevealDoor(j.revealDoor)
+    if (r.ok) {
+      setRevealDoor(j.revealDoor)
+      try { await playSound('caseOpen') } catch {}
+    }
   }
   const decide = async (doSwitch: boolean) => {
     if (!sessionId) return
+    try { await playSound('buttonClick') } catch {}
     const r = await fetch('/api/monty/decide', { method: 'POST', body: JSON.stringify({ sessionId, switch: doSwitch }) })
     const j = await r.json()
     if (r.ok) {
       setResult(j)
       refreshCredits()
+      const cost = lastPaidCost ?? 100
+      try {
+        if (Number(j.payout) >= cost) {
+          await playSound('success')
+          setTimeout(() => { playSound('fanfare') }, 250)
+        } else {
+          await playSound('error')
+        }
+      } catch {}
     }
   }
 
@@ -147,28 +167,72 @@ export default function MontyPage() {
               onClick={() => pick(d)}
               className={`p-6 rounded-2xl border shadow-xl transition-transform ${revealDoor === d ? 'border-red-500 bg-red-500/10' : 'border-border bg-card/60'} ${sessionId ? 'hover:scale-[1.02]' : ''} ${result && d === (result as any).finalDoor && (Number((result as any).payout) >= (lastPaidCost ?? 100) ? 'border-green-500 bg-green-500/10' : '')}`}
             >
-              {/* Before reveal: show closed (no text fallback to avoid flicker) */}
+              {/* Before reveal: baseline closed image (or skeleton while assets load) */}
               {!result && revealDoor == null && (
                 assetsReady && assets.closed ? (
-                  <img src={assets.closed} alt="Closed" className="w-full h-64 sm:h-72 object-cover rounded-2xl" loading="eager" decoding="async" />
+                  <div className="relative w-full h-64 sm:h-72 rounded-2xl">
+                    <img src={assets.closed} alt="Closed" className="absolute inset-0 w-full h-full object-cover rounded-2xl" loading="eager" decoding="async" />
+                    {pickOverlayDoor === d && assets.open && (
+                      <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
+                    )}
+                  </div>
                 ) : (
                   <div className="w-full h-64 sm:h-72 rounded-2xl bg-foreground/10 animate-pulse" />
                 )
               )}
-              {/* After reveal dud: if this is the revealed door, show goat; else keep closed */}
+
+              {/* After reveal: goat door opens; others remain closed with optional pick overlay on chosen door */}
               {revealDoor !== null && !result && (
-                d === revealDoor
-                  ? (assets.goat ? <img src={assets.goat} alt="Goat" className="w-full h-64 sm:h-72 object-cover rounded-2xl" loading="eager" decoding="async"/> : <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🐐</div>)
-                  : (assets.closed ? <img src={assets.closed} alt="Closed" className="w-full h-64 sm:h-72 object-cover rounded-2xl" loading="eager" decoding="async"/> : <div className="w-full h-64 sm:h-72 rounded-2xl bg-foreground/10" />)
+                d === revealDoor ? (
+                  <div className="relative w-full h-64 sm:h-72 rounded-2xl">
+                    {assets.goat ? (
+                      <img src={assets.goat} alt="Goat" className="absolute inset-0 w-full h-full object-cover rounded-2xl" loading="eager" decoding="async"/>
+                    ) : (
+                      <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🐐</div>
+                    )}
+                    {assets.open && (
+                      <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative w-full h-64 sm:h-72 rounded-2xl">
+                    {assets.closed ? (
+                      <img src={assets.closed} alt="Closed" className="absolute inset-0 w-full h-full object-cover rounded-2xl" loading="eager" decoding="async"/>
+                    ) : (
+                      <div className="w-full h-64 sm:h-72 rounded-2xl bg-foreground/10" />
+                    )}
+                    {pickOverlayDoor === d && assets.open && (
+                      <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
+                    )}
+                  </div>
+                )
               )}
-              {/* Final: show car for winning door, goat otherwise */}
+
+              {/* Final: open only the final door and keep revealed goat open; third door remains closed */}
               {result && (
-                d === result.finalDoor
-                  ? (result.payout >= (lastPaidCost ?? 100)
-                      ? (assets.car ? <img src={assets.car} alt="Car" className="w-full h-64 sm:h-72 object-cover rounded-2xl"/> : <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🚗</div>)
-                      : (assets.goat ? <img src={assets.goat} alt="Goat" className="w-full h-64 sm:h-72 object-cover rounded-2xl"/> : <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🐐</div>)
-                    )
-                  : (assets.open ? <img src={assets.open} alt="Open" className="w-full h-64 sm:h-72 object-cover rounded-2xl"/> : <div className="w-full h-64 sm:h-72" />)
+                d === result.finalDoor ? (
+                  <div className="relative w-full h-64 sm:h-72 rounded-2xl">
+                    {Number(result.payout) >= (lastPaidCost ?? 100) ? (
+                      assets.car ? <img src={assets.car} alt="Car" className="absolute inset-0 w-full h-full object-cover rounded-2xl"/> : <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🚗</div>
+                    ) : (
+                      assets.goat ? <img src={assets.goat} alt="Goat" className="absolute inset-0 w-full h-full object-cover rounded-2xl"/> : <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🐐</div>
+                    )}
+                    {assets.open && (
+                      <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
+                    )}
+                  </div>
+                ) : (
+                  d === revealDoor ? (
+                    <div className="relative w-full h-64 sm:h-72 rounded-2xl">
+                      {assets.goat ? <img src={assets.goat} alt="Goat" className="absolute inset-0 w-full h-full object-cover rounded-2xl"/> : <div className="h-64 sm:h-72 flex items-center justify-center text-4xl">🐐</div>}
+                      {assets.open && (
+                        <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
+                      )}
+                    </div>
+                  ) : (
+                    assets.closed ? <img src={assets.closed} alt="Closed" className="w-full h-64 sm:h-72 object-cover rounded-2xl"/> : <div className="w-full h-64 sm:h-72 rounded-2xl bg-foreground/10" />
+                  )
+                )
               )}
             </button>
           ))}
