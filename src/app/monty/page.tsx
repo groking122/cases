@@ -16,7 +16,7 @@ export default function MontyPage() {
   const [credits, setCredits] = useState<number | null>(null)
   const [assetsReady, setAssetsReady] = useState<boolean>(false)
   const [rehydrated, setRehydrated] = useState<boolean>(false)
-  const [pickOverlayDoor, setPickOverlayDoor] = useState<number | null>(null)
+  
 
   // Load assets + toggle on mount
   useEffect(() => {
@@ -101,9 +101,6 @@ export default function MontyPage() {
   const pick = async (door: number) => {
     if (!sessionId) return
     setFirstPick(door)
-    // brief open-frame overlay animation on the picked door
-    setPickOverlayDoor(door)
-    setTimeout(() => setPickOverlayDoor((cur) => (cur === door ? null : cur)), 700)
     try { await playMontySfx('open') } catch {}
     const r = await fetch('/api/monty/pick', { method: 'POST', body: JSON.stringify({ sessionId, firstPick: door }) })
     const j = await r.json()
@@ -175,9 +172,6 @@ export default function MontyPage() {
                 assetsReady && assets.closed ? (
                   <div className="relative w-full h-64 sm:h-72 rounded-2xl">
                     <img src={assets.closed} alt="Closed" className="absolute inset-0 w-full h-full object-cover rounded-2xl" loading="eager" decoding="async" />
-                    {pickOverlayDoor === d && assets.open && (
-                      <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
-                    )}
                   </div>
                 ) : (
                   <div className="w-full h-64 sm:h-72 rounded-2xl bg-foreground/10 animate-pulse" />
@@ -203,9 +197,6 @@ export default function MontyPage() {
                       <img src={assets.closed} alt="Closed" className="absolute inset-0 w-full h-full object-cover rounded-2xl" loading="eager" decoding="async"/>
                     ) : (
                       <div className="w-full h-64 sm:h-72 rounded-2xl bg-foreground/10" />
-                    )}
-                    {pickOverlayDoor === d && assets.open && (
-                      <img src={assets.open} alt="Open" className="absolute inset-0 w-full h-full object-cover rounded-2xl" />
                     )}
                   </div>
                 )

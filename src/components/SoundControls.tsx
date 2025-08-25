@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { setSoundEnabled, setSoundVolume, soundManager } from '@/lib/soundManager'
+import { setSoundEnabled, setSoundVolume, soundManager, playSound } from '@/lib/soundManager'
 
 interface Props {
   compact?: boolean
@@ -9,7 +9,8 @@ interface Props {
 
 export default function SoundControls({ compact = false }: Props) {
   const [enabled, setEnabled] = useState<boolean>(true)
-  const [volume, setVolume] = useState<number>(0.7)
+  // store 0-100 for better slider UX, map to 0..1 for engine
+  const [volumePct, setVolumePct] = useState<number>(70)
 
   useEffect(() => {
     try {
@@ -22,7 +23,8 @@ export default function SoundControls({ compact = false }: Props) {
       }
       if (v != null) {
         const vol = Math.max(0, Math.min(1, parseFloat(v)))
-        setVolume(vol)
+        const pct = Math.round(vol * 100)
+        setVolumePct(pct)
         setSoundVolume(vol)
       }
     } catch {}
@@ -33,34 +35,43 @@ export default function SoundControls({ compact = false }: Props) {
     setEnabled(next)
     setSoundEnabled(next)
     try { localStorage.setItem('sound_enabled', String(next)) } catch {}
+    // Initialize audio context and give feedback
+    soundManager.initializeOnUserGesture()
+    if (next) { try { playSound('buttonClick') } catch {} }
   }
 
-  const onVolume = (val: number) => {
-    const vol = Math.max(0, Math.min(1, val))
-    setVolume(vol)
+  const onVolume = (pct: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)))
+    setVolumePct(clamped)
+    const vol = clamped / 100
     setSoundVolume(vol)
     try { localStorage.setItem('sound_volume', String(vol)) } catch {}
+    soundManager.initializeOnUserGesture()
+    if (enabled) { try { playSound('buttonClick') } catch {} }
   }
 
   return (
     <div className={`flex items-center gap-3 ${compact ? 'text-xs' : 'text-sm'}`}>
       <button
         onClick={toggle}
-        className={`px-3 py-1 rounded-lg border ${enabled ? 'border-emerald-500 text-emerald-400' : 'border-gray-600 text-gray-400'}`}
+        className={`h-9 px-3 rounded-lg border transition-colors ${enabled ? 'border-emerald-500/70 text-emerald-400 hover:border-emerald-400' : 'border-gray-600 text-gray-400 hover:border-gray-500'}`}
         title={enabled ? 'Mute' : 'Unmute'}
       >
         {enabled ? '🔊' : '🔇'}
       </button>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.01}
-        value={volume}
-        onChange={(e) => onVolume(parseFloat(e.target.value))}
-        className="w-28 accent-orange-500"
-        title="Volume"
-      />
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={volumePct}
+          onChange={(e) => onVolume(parseInt(e.target.value, 10))}
+          className="w-28 accent-orange-500"
+          title="Volume"
+        />
+        <span className="w-8 text-center tabular-nums text-foreground/70">{volumePct}%</span>
+      </div>
     </div>
   )
 }
