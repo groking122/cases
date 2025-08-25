@@ -12,6 +12,7 @@ import SymbolEditor from '@/components/admin/SymbolEditor'
 import AdminAnalytics from '@/components/admin/AdminAnalytics'
 import dynamic from 'next/dynamic'
 const AdminMetrics = dynamic(() => import('./components/AdminMetrics'), { ssr: false })
+const MontyAdminPanel = dynamic(() => import('./components/MontyAdminPanel'), { ssr: false })
 import WithdrawalRequests from '@/components/admin/WithdrawalRequests'
 
 interface AdminDashboardProps {
@@ -20,7 +21,7 @@ interface AdminDashboardProps {
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'metrics' | 'withdrawals' | 'account'>('dashboard')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cases' | 'symbols' | 'analytics' | 'metrics' | 'withdrawals' | 'monty' | 'account'>('dashboard')
   const [stats, setStats] = useState<AdminDashboardStats | null>(null)
   const [cases, setCases] = useState<CaseConfig[]>([])
   const [symbols, setSymbols] = useState<Symbol[]>([])
@@ -114,6 +115,7 @@ export default function AdminDashboard() {
     { id: 'withdrawals', label: 'Withdrawals', icon: '💸' },
     { id: 'analytics', label: 'Analytics', icon: '📈' },
     { id: 'metrics', label: 'Metrics', icon: '🧮' },
+    { id: 'monty', label: 'Monty', icon: '🚪' },
     { id: 'account', label: 'Account', icon: '🔐' }
   ] as const
 
@@ -341,6 +343,10 @@ export default function AdminDashboard() {
 
           {activeTab === 'metrics' && (
             <AdminMetrics />
+          )}
+
+          {activeTab === 'monty' && (
+            <MontyAdminPanel />
           )}
 
           {activeTab === 'account' && (
