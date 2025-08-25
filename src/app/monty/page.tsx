@@ -13,6 +13,7 @@ export default function MontyPage() {
   const [lastPaidCost, setLastPaidCost] = useState<number | null>(null)
   const [credits, setCredits] = useState<number | null>(null)
   const [assetsReady, setAssetsReady] = useState<boolean>(false)
+  const [rehydrated, setRehydrated] = useState<boolean>(false)
 
   // Load assets + toggle on mount
   useEffect(() => {
@@ -46,6 +47,22 @@ export default function MontyPage() {
   }, [])
 
   useEffect(() => { refreshCredits() }, [])
+
+  // Rehydrate active session on mount to prevent losing a paid game on refresh
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/monty/active', { method: 'GET', cache: 'no-store' })
+        const j = await r.json()
+        if (r.ok && j?.session) {
+          setSessionId(j.session.id)
+          setFirstPick(j.session.first_pick)
+          setRevealDoor(j.session.reveal_door)
+        }
+      } catch {}
+      setRehydrated(true)
+    })()
+  }, [])
 
   const refreshCredits = async () => {
     try {
@@ -104,8 +121,17 @@ export default function MontyPage() {
             <span className="text-3xl font-bold">{credits ?? '—'}</span>
             <span className="text-sm text-foreground/50">credits</span>
           </div>
-          <button onClick={start} className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg">{lastPaidCost ? `Play (${lastPaidCost})` : 'Play (100)'}</button>
+          <button
+            onClick={start}
+            disabled={!rehydrated || (!!sessionId && !result)}
+            className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {lastPaidCost ? `Play (${lastPaidCost})` : 'Play (100)'}
+          </button>
         </div>
+        {!!sessionId && !result && (
+          <div className="text-xs text-foreground/60">Finish your current round to play again.</div>
+        )}
         {sessionId && (
           <div className="text-sm text-foreground/70 flex flex-col sm:flex-row sm:items-center gap-1">
             <span>Paid: {lastPaidCost ?? 100} credits</span>
@@ -117,9 +143,9 @@ export default function MontyPage() {
           {[0,1,2].map((d) => (
             <button
               key={d}
-              disabled={!sessionId || revealDoor !== null || !!result || !assetsReady}
+              disabled={!rehydrated || !sessionId || revealDoor !== null || !!result || !assetsReady}
               onClick={() => pick(d)}
-              className={`p-6 rounded-2xl border shadow-xl transition-transform ${revealDoor === d ? 'border-red-500 bg-red-500/10' : 'border-border bg-card/60'} ${sessionId ? 'hover:scale-[1.02]' : ''}`}
+              className={`p-6 rounded-2xl border shadow-xl transition-transform ${revealDoor === d ? 'border-red-500 bg-red-500/10' : 'border-border bg-card/60'} ${sessionId ? 'hover:scale-[1.02]' : ''} ${result && d === (result as any).finalDoor && (Number((result as any).payout) >= (lastPaidCost ?? 100) ? 'border-green-500 bg-green-500/10' : '')}`}
             >
               {/* Before reveal: show closed (no text fallback to avoid flicker) */}
               {!result && revealDoor == null && (
@@ -153,12 +179,29 @@ export default function MontyPage() {
             <button onClick={() => decide(false)} className="px-6 py-3 rounded-xl border border-border font-semibold">Stay</button>
           </div>
         )}
+        {!result && sessionId && rehydrated && revealDoor == null && (
+          <div className="text-sm text-foreground/70">Pick a door to continue your active game.</div>
+        )}
         {result && (
-          <div className="p-4 rounded-xl border border-border bg-card/60">
-            <div>Final door: {Number(result.finalDoor) + 1}</div>
-            <div>Payout: {result.payout}</div>
-            {/* pity disabled */}
-          </div>
+          Number(result.payout) >= (lastPaidCost ?? 100) ? (
+            <div className="p-6 rounded-2xl border bg-gradient-to-r from-emerald-600/20 to-lime-500/20 border-emerald-500">
+              <div className="text-lg font-semibold text-emerald-400">You won!</div>
+              <div className="text-3xl font-bold">+{Number(result.payout)} credits</div>
+              <div className="text-sm text-foreground/70 mb-3">Final door: {Number(result.finalDoor) + 1}</div>
+              <div className="flex gap-3">
+                <button onClick={start} className="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold">Play again</button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl border border-border bg-card/60">
+              <div className="text-lg font-semibold text-foreground/80">Round finished</div>
+              <div className="text-2xl font-bold">Payout: {Number(result.payout)}</div>
+              <div className="text-sm text-foreground/70 mb-3">Final door: {Number(result.finalDoor) + 1}</div>
+              <div className="flex gap-3">
+                <button onClick={start} className="px-6 py-3 rounded-xl border border-border font-semibold">Play again</button>
+              </div>
+            </div>
+          )
         )}
       </div>
     </div>
