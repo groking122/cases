@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { authFetch } from '@/lib/authFetch'
-import { playSound } from '@/lib/soundManager'
+import { playSound, playMontySfx } from '@/lib/soundManager'
+import SoundControls from '@/components/SoundControls'
 
 export default function MontyPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -80,7 +81,7 @@ export default function MontyPage() {
   }
 
   const start = async () => {
-    try { await playSound('buttonClick') } catch {}
+    try { await playMontySfx('click') } catch {}
     setResult(null)
     setRevealDoor(null)
     setFirstPick(null)
@@ -103,17 +104,17 @@ export default function MontyPage() {
     // brief open-frame overlay animation on the picked door
     setPickOverlayDoor(door)
     setTimeout(() => setPickOverlayDoor((cur) => (cur === door ? null : cur)), 700)
-    try { await playSound('caseOpen') } catch {}
+    try { await playMontySfx('open') } catch {}
     const r = await fetch('/api/monty/pick', { method: 'POST', body: JSON.stringify({ sessionId, firstPick: door }) })
     const j = await r.json()
     if (r.ok) {
       setRevealDoor(j.revealDoor)
-      try { await playSound('caseOpen') } catch {}
+      try { await playMontySfx('open') } catch {}
     }
   }
   const decide = async (doSwitch: boolean) => {
     if (!sessionId) return
-    try { await playSound('buttonClick') } catch {}
+    try { await playMontySfx('click') } catch {}
     const r = await fetch('/api/monty/decide', { method: 'POST', body: JSON.stringify({ sessionId, switch: doSwitch }) })
     const j = await r.json()
     if (r.ok) {
@@ -122,10 +123,9 @@ export default function MontyPage() {
       const cost = lastPaidCost ?? 100
       try {
         if (Number(j.payout) >= cost) {
-          await playSound('success')
-          setTimeout(() => { playSound('fanfare') }, 250)
+          await playMontySfx('win')
         } else {
-          await playSound('error')
+          await playMontySfx('lose')
         }
       } catch {}
     }
@@ -141,13 +141,16 @@ export default function MontyPage() {
             <span className="text-3xl font-bold">{credits ?? '—'}</span>
             <span className="text-sm text-foreground/50">credits</span>
           </div>
-          <button
-            onClick={start}
-            disabled={!rehydrated || (!!sessionId && !result)}
-            className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {lastPaidCost ? `Play (${lastPaidCost})` : 'Play (100)'}
-          </button>
+          <div className="flex items-center gap-4">
+            <SoundControls compact />
+            <button
+              onClick={start}
+              disabled={!rehydrated || (!!sessionId && !result)}
+              className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-8 py-4 rounded-xl font-semibold shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {lastPaidCost ? `Play (${lastPaidCost})` : 'Play (100)'}
+            </button>
+          </div>
         </div>
         {!!sessionId && !result && (
           <div className="text-xs text-foreground/60">Finish your current round to play again.</div>

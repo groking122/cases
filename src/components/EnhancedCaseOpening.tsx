@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LoadingButton } from '@/components/LoadingButton';
 import toast from 'react-hot-toast';
 import { playCaseOpeningSequence, playSound } from '@/lib/soundManager';
+import SoundControls from '@/components/SoundControls';
 import { SpinningReelCarousel } from './SpinningReelCarousel';
 // Removed hardcoded symbols - using database data instead
 
@@ -242,6 +243,9 @@ export const EnhancedCaseOpening: React.FC<EnhancedCaseOpeningProps> = ({
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[360px] sm:min-h-[500px] p-4 sm:p-8 bg-gradient-to-br from-gray-900 via-black to-gray-800 backdrop-blur-md rounded-2xl border border-orange-500/50 shadow-2xl">
+      <div className="w-full flex justify-end mb-2">
+        <SoundControls compact />
+      </div>
       <AnimatePresence mode="wait">
         {/* Case Display */}
         <motion.div

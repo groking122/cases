@@ -106,6 +106,7 @@ class SoundManager {
   private isEnabled: boolean = true;
   private masterVolume: number = 0.7;
   private isLoaded: boolean = false;
+  private howls: Record<string, Howl | null> = {};
 
   constructor() {
     this.initializeAudioContext();
@@ -165,6 +166,37 @@ class SoundManager {
     } catch (error) {
       console.warn(`Error playing sound ${soundName}:`, error);
     }
+  }
+
+  // Try file SFX first, then fallback to a built-in beep
+  async playFileOrFallback(key: string, sources: string[], fallback: SoundName): Promise<void> {
+    if (!this.isEnabled) return;
+    try {
+      // Initialize on gesture if needed
+      await this.initializeOnUserGesture();
+      if (typeof window === 'undefined') return;
+
+      if (!this.howls[key]) {
+        // Create Howl instance; errors will be handled via loaderror event
+        const h = new Howl({
+          src: sources,
+          volume: this.masterVolume,
+          html5: false,
+          preload: true,
+          onloaderror: () => { this.howls[key] = null; }
+        });
+        this.howls[key] = h;
+      }
+
+      const howl = this.howls[key];
+      if (howl) {
+        howl.volume(this.masterVolume);
+        howl.play();
+        return;
+      }
+    } catch {}
+    // Fallback to procedural beep
+    await this.play(fallback);
   }
 
   // Play rarity-specific reveal sound
@@ -325,6 +357,28 @@ export const playRevealSound = async (rarity: Rarity) => {
 export const playCaseOpeningSequence = async (rarity: Rarity) => {
   await soundManager.initializeOnUserGesture();
   return soundManager.playCaseOpeningSequence(rarity);
+};
+
+// Monty-specific SFX: looks for files in /sfx, falls back to procedural beeps
+const MONTY_FILES: Record<'click'|'open'|'win'|'lose', string[]> = {
+  click: ['/sfx/monty-click.mp3', '/sfx/monty-click.ogg'],
+  open: ['/sfx/monty-open.mp3', '/sfx/monty-open.ogg'],
+  win: ['/sfx/monty-win.mp3', '/sfx/monty-win.ogg'],
+  lose: ['/sfx/monty-lose.mp3', '/sfx/monty-lose.ogg']
+};
+
+const MONTY_FALLBACK: Record<'click'|'open'|'win'|'lose', SoundName> = {
+  click: 'buttonClick',
+  open: 'caseOpen',
+  win: 'success',
+  lose: 'error'
+};
+
+export const playMontySfx = async (type: 'click'|'open'|'win'|'lose') => {
+  const key = `monty-${type}`;
+  const sources = MONTY_FILES[type];
+  const fallback = MONTY_FALLBACK[type];
+  return soundManager.playFileOrFallback(key, sources, fallback);
 };
 
 export const setSoundEnabled = (enabled: boolean) => soundManager.setEnabled(enabled);
