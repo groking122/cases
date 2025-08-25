@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { ImageUpload } from '@/components/ImageUpload'
+import toast from 'react-hot-toast'
 
 export default function MontyAdminPanel() {
   const [loading, setLoading] = useState(false)
@@ -96,12 +97,19 @@ export default function MontyAdminPanel() {
               const j = await res.json()
               if (res.ok && j.success) {
                 if (typeof j.rtp === 'number') setRtp(Number(j.rtp))
-                alert(`Settings saved. RTP: ${(Number(j.rtp||0)*100).toFixed(2)}%`)
+                const r = Number(j.rtp||0)
+                if (r >= 1) {
+                  toast.error(`RTP ${(r*100).toFixed(2)}% ≥ 100% — blocked.`)
+                } else if (r > 0.94) {
+                  toast(`High RTP ${(r*100).toFixed(2)}%`, { icon: '⚠️' })
+                } else {
+                  toast.success(`Settings saved. RTP ${(r*100).toFixed(2)}%`)
+                }
               } else {
-                alert(`Failed: ${j.error || res.statusText}`)
+                toast.error(j.error || res.statusText)
               }
             } catch (e: any) {
-              alert(e?.message || 'Failed')
+              toast.error(e?.message || 'Failed')
             }
           }}
           className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
@@ -136,10 +144,10 @@ export default function MontyAdminPanel() {
                 body: JSON.stringify({ items })
               })
               const j = await res.json()
-              if (res.ok && j.success) alert('Assets saved')
-              else alert(`Failed: ${j.error || res.statusText}`)
+              if (res.ok && j.success) toast.success('Assets saved')
+              else toast.error(j.error || res.statusText)
             } catch (e: any) {
-              alert(e?.message || 'Failed')
+              toast.error(e?.message || 'Failed')
             }
           }}
           className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"

@@ -22,28 +22,25 @@ async function handler(request: any) {
       }
     } catch {}
 
-    // Debit cost with idempotency
     const idemKey = request.headers?.get?.('idempotency-key') || randomUUID()
-    await applyCredit(userId, -BigInt(cost), 'bet:monty', idemKey)
 
     const winningDoor = randInt(0, DEFAULT_DOORS - 1)
     const serverSeed = newServerSeed()
     const serverSeedHash = sha256(serverSeed)
 
     if (!supabaseAdmin) return NextResponse.json({ error: 'Database configuration error' }, { status: 500 })
-    const { data, error } = await supabaseAdmin
-      .from('monty_sessions')
-      .insert({
-        user_id: userId,
-        winning_door: winningDoor,
-        server_seed: serverSeed,
-        server_seed_hash: serverSeedHash,
-      })
-      .select('id')
-      .single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    const { data: startData, error: startErr } = await supabaseAdmin.rpc('monty_start_atomic', {
+      p_user_id: userId,
+      p_cost: cost,
+      p_winning_door: winningDoor,
+      p_server_seed: serverSeed,
+      p_server_seed_hash: serverSeedHash,
+      p_idem_key: idemKey,
+    })
+    if (startErr) return NextResponse.json({ error: startErr.message }, { status: 500 })
+    const sessionId = startData as unknown as string
 
-    return NextResponse.json({ sessionId: data!.id, doors: DEFAULT_DOORS, serverSeedHash })
+    return NextResponse.json({ sessionId, doors: DEFAULT_DOORS, serverSeedHash })
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'start_failed' }, { status: 500 })
   }

@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
 import { withUserAuth } from '@/lib/mw/withUserAuth'
 // Defaults in case DB settings are unavailable
 const DEFAULT_COST = 100
 const DEFAULT_WIN = 118
 const DEFAULT_LOSE = 40
 import { applyCredit } from '@/lib/credits/applyCredit'
-import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase'
+import { randomUUID } from 'crypto'
 
 // Pity disabled per request
 
@@ -51,21 +50,15 @@ async function handler(request: any) {
     let payout = finalDoor === s.winning_door ? win : lose
     const isPity = false
 
-    // Credit with idempotency
+    // Credit + settle atomically
     const winKey = request.headers?.get?.('idempotency-key') || `monty:${sessionId}` || randomUUID()
-    await applyCredit(s.user_id, BigInt(payout), 'win:monty', winKey)
-
-    const { error: e2 } = await supabaseAdmin
-      .from('monty_sessions')
-      .update({
-        did_switch: !!doSwitch,
-        final_door: finalDoor,
-        payout,
-        is_settled: true,
-        settled_at: new Date().toISOString(),
-      })
-      .eq('id', sessionId)
-    if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })
+    const { error: settleErr } = await supabaseAdmin.rpc('monty_settle_atomic', {
+      p_session_id: sessionId,
+      p_user_id: s.user_id,
+      p_payout: payout,
+      p_idem_key: winKey,
+    })
+    if (settleErr) return NextResponse.json({ error: settleErr.message }, { status: 500 })
 
     return NextResponse.json({
       finalDoor,
