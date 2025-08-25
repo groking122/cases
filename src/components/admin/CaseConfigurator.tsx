@@ -56,6 +56,48 @@ export default function CaseConfigurator({
   const [selectedSymbols, setSelectedSymbols] = useState<Set<string>>(
     new Set(formData.symbols.map(s => s.symbolId))
   )
+  const [montyAssets, setMontyAssets] = useState<{ closed: string; open: string; goat: string; car: string }>({ closed: '', open: '', goat: '', car: '' })
+  const [montyAutoPick, setMontyAutoPick] = useState<boolean>(false)
+  const [montyCost, setMontyCost] = useState<number>(100)
+  const [montyWin, setMontyWin] = useState<number>(118)
+  const [montyLose, setMontyLose] = useState<number>(40)
+  const [montyTrue, setMontyTrue] = useState<boolean>(true)
+  const [montyRtp, setMontyRtp] = useState<number | null>(null)
+
+  // Load Monty assets on mount
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/monty-assets', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+        })
+        const j = await res.json()
+        if (res.ok && Array.isArray(j.data)) {
+          const map: any = { closed: '', open: '', goat: '', car: '' }
+          for (const row of j.data) map[row.key] = row.url
+          setMontyAssets(map)
+        }
+      } catch {}
+      try {
+        const raw = localStorage.getItem('monty:autoPick')
+        setMontyAutoPick(raw === 'true')
+      } catch {}
+      try {
+        const res2 = await fetch('/api/admin/monty-settings', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` }
+        })
+        const j2 = await res2.json()
+        if (res2.ok && j2?.data) {
+          const d = j2.data
+          setMontyTrue(Boolean(d.is_true_monty))
+          setMontyCost(Number(d.cost || 100))
+          setMontyWin(Number(d.payout_win || 118))
+          setMontyLose(Number(d.payout_lose || 40))
+          if (typeof j2.rtp === 'number') setMontyRtp(j2.rtp)
+        }
+      } catch {}
+    })()
+  }, [])
 
   useEffect(() => {
     validateProbabilities()
@@ -452,6 +494,106 @@ export default function CaseConfigurator({
           >
             {isLoading ? 'Saving...' : existingCase ? 'Update Case' : 'Create Case'}
           </button>
+        </div>
+
+        {/* Monty Hall Assets */}
+        <div className="mt-10 border-t border-gray-700 pt-6">
+          <h3 className="text-lg font-semibold mb-1">Monty Hall Assets</h3>
+          <p className="text-sm text-gray-400 mb-4">Upload images used by the Monty Hall mini-game and set behavior.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <label className="text-sm text-gray-300">True Monty (switch matters)
+              <input type="checkbox" className="ml-2" checked={montyTrue} onChange={(e)=> setMontyTrue(e.target.checked)} />
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <div className="text-xs text-gray-400">Cost</div>
+                <input type="number" value={montyCost} onChange={(e)=> setMontyCost(Number(e.target.value)||0)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm" />
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Win (car)</div>
+                <input type="number" value={montyWin} onChange={(e)=> setMontyWin(Number(e.target.value)||0)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm" />
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Lose (goat)</div>
+                <input type="number" value={montyLose} onChange={(e)=> setMontyLose(Number(e.target.value)||0)} className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm" />
+              </div>
+            </div>
+            {montyRtp !== null && (
+              <div className="text-xs text-gray-400">Current RTP: {(montyRtp*100).toFixed(2)}%</div>
+            )}
+            <div className="text-xs text-gray-500">Changing payouts affects RTP. For true Monty, EV = (2/3)*Win + (1/3)*Lose.</div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {(['closed','open','goat','car'] as const).map((k) => (
+              <div key={k} className="border border-gray-700 rounded-lg p-4">
+                <div className="text-sm font-medium mb-2 capitalize">{k} image</div>
+                <ImageUpload
+                  onUpload={(url) => setMontyAssets(prev => ({ ...prev, [k]: url }))}
+                  folder="icons"
+                  isAdmin={true}
+                  currentImage={montyAssets[k]}
+                  buttonText="Upload"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex items-center gap-3">
+            <input id="monty-auto" type="checkbox" checked={montyAutoPick} onChange={(e) => {
+              setMontyAutoPick(e.target.checked);
+              try { localStorage.setItem('monty:autoPick', String(e.target.checked)) } catch {}
+            }} />
+            <label htmlFor="monty-auto" className="text-sm text-gray-300">Use auto-pick (skip manual first pick)</label>
+          </div>
+          <div className="mt-4 space-x-2">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const items = Object.entries(montyAssets).filter(([,url]) => !!url).map(([key, url]) => ({ key, url }))
+                  const res = await fetch('/api/admin/monty-assets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+                    body: JSON.stringify({ items })
+                  })
+                  const j = await res.json()
+                  if (res.ok && j.success) {
+                    alert('Monty assets saved')
+                  } else {
+                    alert(`Failed to save: ${j.error || res.statusText}`)
+                  }
+                } catch (e: any) {
+                  alert(`Error: ${e.message}`)
+                }
+              }}
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-white"
+            >
+              Save Monty Assets
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/admin/monty-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('adminToken')}` },
+                    body: JSON.stringify({ is_true_monty: montyTrue, cost: montyCost, payout_win: montyWin, payout_lose: montyLose })
+                  })
+                  const j = await res.json()
+                  if (res.ok && j.success) {
+                    if (typeof j.rtp === 'number') setMontyRtp(j.rtp)
+                    alert(`Monty settings saved. RTP: ${(Number(j.rtp||0)*100).toFixed(2)}%`)
+                  } else {
+                    alert(`Failed to save settings: ${j.error || res.statusText}`)
+                  }
+                } catch (e: any) {
+                  alert(`Error: ${e.message}`)
+                }
+              }}
+              className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded text-white"
+            >
+              Save Monty Settings
+            </button>
+          </div>
         </div>
       </form>
     </motion.div>

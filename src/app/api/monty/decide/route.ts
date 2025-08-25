@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 import { withUserAuth } from '@/lib/mw/withUserAuth'
-import { MONTY } from '@/config/games'
+// Defaults in case DB settings are unavailable
+const DEFAULT_COST = 100
+const DEFAULT_WIN = 118
+const DEFAULT_LOSE = 40
 import { applyCredit } from '@/lib/credits/applyCredit'
+import { randomUUID } from 'crypto'
+import { supabaseAdmin } from '@/lib/supabase'
 
 // Pity disabled per request
 
@@ -28,10 +33,27 @@ async function handler(request: any) {
     const switchedDoor = unopened[0]
     const finalDoor = doSwitch ? switchedDoor : s.first_pick
 
-    let payout = finalDoor === s.winning_door ? MONTY.payouts.car : MONTY.payouts.goat
+    // Load settings (fallback to defaults)
+    let cost = DEFAULT_COST
+    let win = DEFAULT_WIN
+    let lose = DEFAULT_LOSE
+    try {
+      if (supabaseAdmin) {
+        const { data } = await supabaseAdmin.from('monty_settings').select('cost,payout_win,payout_lose').limit(1).maybeSingle()
+        if (data) {
+          if (typeof data.cost === 'number' && data.cost > 0) cost = data.cost
+          if (typeof data.payout_win === 'number') win = data.payout_win
+          if (typeof data.payout_lose === 'number') lose = data.payout_lose
+        }
+      }
+    } catch {}
+
+    let payout = finalDoor === s.winning_door ? win : lose
     const isPity = false
 
-    await applyCredit(s.user_id, BigInt(payout), 'win:monty', undefined)
+    // Credit with idempotency
+    const winKey = request.headers?.get?.('idempotency-key') || `monty:${sessionId}` || randomUUID()
+    await applyCredit(s.user_id, BigInt(payout), 'win:monty', winKey)
 
     const { error: e2 } = await supabaseAdmin
       .from('monty_sessions')
@@ -48,7 +70,7 @@ async function handler(request: any) {
     return NextResponse.json({
       finalDoor,
       payout,
-      isWin: payout >= MONTY.cost,
+      isWin: payout >= cost,
       isPityActivated: isPity,
       serverSeed: s.server_seed,
       serverSeedHash: s.server_seed_hash,

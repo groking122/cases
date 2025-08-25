@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function MontyPage() {
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -8,6 +8,22 @@ export default function MontyPage() {
   const [firstPick, setFirstPick] = useState<number | null>(null)
   const [result, setResult] = useState<any>(null)
   const [assets, setAssets] = useState<{[k:string]: string}>({})
+  const [autoPick, setAutoPick] = useState<boolean>(false)
+
+  // Load assets + toggle on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/monty/assets', { cache: 'no-store' })
+        const j = await res.json()
+        if (res.ok && j?.assets) setAssets(j.assets)
+      } catch {}
+      try {
+        const raw = localStorage.getItem('monty:autoPick')
+        setAutoPick(raw === 'true')
+      } catch {}
+    })()
+  }, [])
 
   const start = async () => {
     setResult(null)
@@ -15,7 +31,14 @@ export default function MontyPage() {
     setFirstPick(null)
     const r = await fetch('/api/monty/start', { method: 'POST' })
     const j = await r.json()
-    if (r.ok) setSessionId(j.sessionId)
+    if (r.ok) {
+      setSessionId(j.sessionId)
+      if (autoPick) {
+        // auto-pick random door
+        const door = Math.floor(Math.random() * 3)
+        await pick(door)
+      }
+    }
   }
   const pick = async (door: number) => {
     if (!sessionId) return
@@ -36,6 +59,9 @@ export default function MontyPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         <h1 className="text-h2 font-bold">Monty Hall</h1>
         <button onClick={start} className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-6 py-3 rounded-xl font-semibold">Play (100)</button>
+        {!sessionId && (
+          <div className="text-xs text-foreground/60">Tip: you can toggle auto-pick in Admin → Cases (Monty Hall Assets).</div>
+        )}
         <div className="grid grid-cols-3 gap-4">
           {[0,1,2].map((d) => (
             <button
@@ -44,10 +70,28 @@ export default function MontyPage() {
               onClick={() => pick(d)}
               className={`p-6 rounded-xl border ${revealDoor === d ? 'border-red-500 bg-red-500/10' : 'border-border bg-card/60'}`}
             >
-              {assets.closed ? (
-                <img src={assets.closed} alt={`Door ${d+1}`} className="w-full h-32 object-cover rounded" />
-              ) : (
-                <>Door {d + 1}</>
+              {/* Before reveal: show closed */}
+              {!result && revealDoor == null && (
+                assets.closed ? (
+                  <img src={assets.closed} alt={`Door ${d+1}`} className="w-full h-32 object-cover rounded" />
+                ) : (
+                  <>Door {d + 1}</>
+                )
+              )}
+              {/* After reveal dud: if this is the revealed door, show goat; else keep closed */}
+              {revealDoor !== null && !result && (
+                d === revealDoor
+                  ? (assets.goat ? <img src={assets.goat} alt="Goat" className="w-full h-32 object-cover rounded"/> : <>🐐</>)
+                  : (assets.closed ? <img src={assets.closed} alt="Closed" className="w-full h-32 object-cover rounded"/> : <>Door {d+1}</>)
+              )}
+              {/* Final: show car for winning door, goat otherwise */}
+              {result && (
+                d === result.finalDoor
+                  ? (result.payout >= 100
+                      ? (assets.car ? <img src={assets.car} alt="Car" className="w-full h-32 object-cover rounded"/> : <>🚗</>)
+                      : (assets.goat ? <img src={assets.goat} alt="Goat" className="w-full h-32 object-cover rounded"/> : <>🐐</>)
+                    )
+                  : (assets.open ? <img src={assets.open} alt="Open" className="w-full h-32 object-cover rounded"/> : <></>)
               )}
             </button>
           ))}

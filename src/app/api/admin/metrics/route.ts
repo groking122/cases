@@ -61,6 +61,33 @@ export async function GET(request: NextRequest) {
       console.error('kpi_rtp error:', e)
     }
 
+    // Monty RTP (append as a row in RTP table)
+    try {
+      const { data: montyRows, error: montyErr } = await supabase
+        .from('monty_sessions')
+        .select('payout, settled_at')
+        .gte('settled_at', startIso)
+        .lte('settled_at', endIso)
+        .eq('is_settled', true)
+      if (!montyErr && Array.isArray(montyRows)) {
+        const spins = montyRows.length
+        const totalReward = montyRows.reduce((a: number, r: any) => a + Number(r.payout || 0), 0)
+        const totalCost = spins * 100 // Monty cost is fixed at 100
+        const r = totalCost > 0 ? totalReward / totalCost : 0
+        rtp.push({
+          caseId: 'monty',
+          caseName: 'Monty Hall',
+          spins,
+          totalCost,
+          totalReward,
+          rtp: r,
+          houseEdge: 1 - r,
+        })
+      }
+    } catch (e) {
+      console.error('monty rtp error:', e)
+    }
+
     try {
       const res = await supabase.rpc('kpi_pity', { start_ts: startIso, end_ts: endIso })
       const rows = Array.isArray(res.data) ? res.data : []

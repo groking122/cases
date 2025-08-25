@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { randInt, newServerSeed, sha256 } from '@/lib/rng'
-import { MONTY } from '@/config/games'
+import { randomUUID } from 'crypto'
+// Defaults in case DB settings are unavailable
+const DEFAULT_DOORS = 3
 import { supabaseAdmin } from '@/lib/supabase'
 import { withUserAuth } from '@/lib/mw/withUserAuth'
 import { applyCredit } from '@/lib/credits/applyCredit'
@@ -10,10 +12,21 @@ async function handler(request: any) {
     const userId = (request as any)?.user?.id
     if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-    // Debit cost (idempotency can be keyed by session once created)
-    await applyCredit(userId, -BigInt(MONTY.cost), 'bet:monty', undefined)
+    // Load settings (fallback to defaults)
+    const DEFAULT_COST = 100
+    let cost = DEFAULT_COST
+    try {
+      if (supabaseAdmin) {
+        const { data } = await supabaseAdmin.from('monty_settings').select('cost').limit(1).maybeSingle()
+        if (data && typeof data.cost === 'number' && data.cost > 0) cost = data.cost
+      }
+    } catch {}
 
-    const winningDoor = randInt(0, MONTY.doors - 1)
+    // Debit cost with idempotency
+    const idemKey = request.headers?.get?.('idempotency-key') || randomUUID()
+    await applyCredit(userId, -BigInt(cost), 'bet:monty', idemKey)
+
+    const winningDoor = randInt(0, DEFAULT_DOORS - 1)
     const serverSeed = newServerSeed()
     const serverSeedHash = sha256(serverSeed)
 
@@ -30,7 +43,7 @@ async function handler(request: any) {
       .single()
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    return NextResponse.json({ sessionId: data!.id, doors: MONTY.doors, serverSeedHash })
+    return NextResponse.json({ sessionId: data!.id, doors: DEFAULT_DOORS, serverSeedHash })
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'start_failed' }, { status: 500 })
   }
