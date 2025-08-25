@@ -55,7 +55,7 @@ export default function MontyPage() {
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/monty/active', { method: 'GET', cache: 'no-store' })
+        const r = await authFetch('/api/monty/active', { method: 'GET', cache: 'no-store' })
         const j = await r.json()
         if (r.ok && j?.session) {
           setSessionId(j.session.id)
@@ -85,7 +85,7 @@ export default function MontyPage() {
     setResult(null)
     setRevealDoor(null)
     setFirstPick(null)
-    const r = await fetch('/api/monty/start', { method: 'POST' })
+    const r = await authFetch('/api/monty/start', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
     const j = await r.json()
     if (r.ok) {
       setSessionId(j.sessionId)
@@ -102,7 +102,7 @@ export default function MontyPage() {
     if (!sessionId) return
     setFirstPick(door)
     try { await playMontySfx('open') } catch {}
-    const r = await fetch('/api/monty/pick', { method: 'POST', body: JSON.stringify({ sessionId, firstPick: door }) })
+    const r = await authFetch('/api/monty/pick', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, firstPick: door }) })
     const j = await r.json()
     if (r.ok) {
       setRevealDoor(j.revealDoor)
@@ -112,7 +112,7 @@ export default function MontyPage() {
   const decide = async (doSwitch: boolean) => {
     if (!sessionId) return
     try { await playMontySfx('click') } catch {}
-    const r = await fetch('/api/monty/decide', { method: 'POST', body: JSON.stringify({ sessionId, switch: doSwitch }) })
+    const r = await authFetch('/api/monty/decide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId, switch: doSwitch }) })
     const j = await r.json()
     if (r.ok) {
       setResult(j)
