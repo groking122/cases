@@ -40,7 +40,7 @@ async function handler(request: any) {
     if (startErr) return NextResponse.json({ error: startErr.message }, { status: 500 })
     const sessionId = startData as unknown as string
 
-    return NextResponse.json({ sessionId, doors: DEFAULT_DOORS, serverSeedHash })
+    return NextResponse.json({ sessionId, doors: DEFAULT_DOORS, serverSeedHash, cost })
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'start_failed' }, { status: 500 })
   }
